@@ -231,6 +231,60 @@ html, body {
   margin: 0 0 24px;
 }
 
+.install-banner {
+  margin-top: 16px;
+}
+
+.install-button {
+  background: #ffffff;
+  border: 2px solid var(--blue);
+  color: var(--blue);
+  font-size: 18px;
+  font-weight: 600;
+  padding: 12px 22px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.install-button:hover { background: var(--blue); color: #ffffff; }
+.install-button:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
+.install-button > span:first-child { font-size: 22px; line-height: 1; }
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.modal-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 28px 24px;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+.modal-card h2 { font-size: 28px; margin: 0 0 16px; text-align: center; }
+
+.install-steps {
+  font-size: 20px;
+  line-height: 1.6;
+  padding-left: 24px;
+  margin: 0 0 20px;
+}
+
+.install-steps li { margin-bottom: 10px; }
+
 @media (max-width: 480px) {
   body { font-size: 20px; }
   .header h1 { font-size: 34px; }

@@ -2,16 +2,43 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Send Your Photos</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#1565c0" />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="WaiNui" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 </head>
 <body>
   <main class="container">
     <header class="header">
       <h1>Send Your Photos</h1>
       <p class="subtitle">Choose your photos below, then press the big green button.</p>
+      <div id="install-banner" class="install-banner hidden">
+        <button id="install-button" class="install-button" type="button">
+          <span aria-hidden="true">&#128241;</span>
+          <span>Install on this device</span>
+        </button>
+      </div>
     </header>
+
+    <div id="ios-install-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="ios-install-title">
+      <div class="modal-card">
+        <h2 id="ios-install-title">Install on your iPhone</h2>
+        <ol class="install-steps">
+          <li>Tap the <strong>Share</strong> button at the bottom of Safari (the square with an arrow).</li>
+          <li>Scroll down and tap <strong>Add to Home Screen</strong>.</li>
+          <li>Tap <strong>Add</strong> in the top right.</li>
+        </ol>
+        <button id="ios-install-close" class="big-button button-blue" type="button">
+          <span class="button-text">Got it</span>
+        </button>
+      </div>
+    </div>
 
     <section id="step-pick" class="card">
       <label class="name-row">

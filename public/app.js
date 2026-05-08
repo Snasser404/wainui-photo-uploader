@@ -247,3 +247,63 @@ againButton.addEventListener('click', () => {
 retryButton.addEventListener('click', () => {
   show(stepPick);
 });
+
+// ---------- PWA: install prompt + service worker ----------
+
+const installBanner = document.getElementById('install-banner');
+const installButton = document.getElementById('install-button');
+const iosModal = document.getElementById('ios-install-modal');
+const iosClose = document.getElementById('ios-install-close');
+
+function isStandalone() {
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true
+  );
+}
+
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  if (!isStandalone()) installBanner.classList.remove('hidden');
+});
+
+installButton.addEventListener('click', async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') installBanner.classList.add('hidden');
+    deferredPrompt = null;
+  } else if (isIOS()) {
+    iosModal.classList.remove('hidden');
+  }
+});
+
+iosClose.addEventListener('click', () => {
+  iosModal.classList.add('hidden');
+});
+
+iosModal.addEventListener('click', (e) => {
+  if (e.target === iosModal) iosModal.classList.add('hidden');
+});
+
+window.addEventListener('appinstalled', () => {
+  installBanner.classList.add('hidden');
+  deferredPrompt = null;
+});
+
+if (isIOS() && !isStandalone()) {
+  installBanner.classList.remove('hidden');
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
