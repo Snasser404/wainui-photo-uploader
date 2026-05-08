@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Send Your Photos</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>Send Your Photos</h1>
+      <p class="subtitle">Choose your photos below, then press the big green button.</p>
+    </header>
+
+    <section id="step-pick" class="card">
+      <label class="name-row">
+        <span class="label-text">Your name (so we know who sent them)</span>
+        <input id="uploader-name" type="text" placeholder="Type your name here" autocomplete="name" />
+      </label>
+
+      <label for="file-input" class="big-button button-blue" id="pick-button">
+        <span class="icon" aria-hidden="true">&#128247;</span>
+        <span class="button-text">Choose Photos</span>
+      </label>
+      <input id="file-input" type="file" accept="image/*,video/*" multiple hidden />
+
+      <p class="hint">You can pick more than one photo at a time.</p>
+
+      <ul id="file-list" class="file-list" aria-live="polite"></ul>
+
+      <button id="upload-button" class="big-button button-green" disabled>
+        <span class="icon" aria-hidden="true">&#10003;</span>
+        <span class="button-text">Upload Now</span>
+      </button>
+    </section>
+
+    <section id="step-uploading" class="card hidden">
+      <h2>Sending your photos&hellip;</h2>
+      <div class="progress-wrap">
+        <div id="progress-bar" class="progress-bar"></div>
+      </div>
+      <p id="progress-text" class="progress-text">Please wait. Do not close this page.</p>
+    </section>
+
+    <section id="step-done" class="card hidden">
+      <div class="success-icon" aria-hidden="true">&#10003;</div>
+      <h2 id="done-heading">Success! Your photos are safe.</h2>
+      <p id="done-detail" class="success-detail"></p>
+      <button id="again-button" class="big-button button-blue">
+        <span class="button-text">Send More Photos</span>
+      </button>
+    </section>
+
+    <section id="step-error" class="card hidden">
+      <div class="error-icon" aria-hidden="true">!</div>
+      <h2>Something went wrong.</h2>
+      <p id="error-detail" class="error-detail">Please try again. If the problem keeps happening, ask someone for help.</p>
+      <button id="retry-button" class="big-button button-blue">
+        <span class="button-text">Try Again</span>
+      </button>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

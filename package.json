@@ -1,0 +1,15 @@
+{
+  "name": "wainui-photo-uploader",
+  "version": "1.0.0",
+  "description": "Senior-friendly photo upload page that saves to OneDrive (free Vercel hosting, direct browser-to-OneDrive uploads)",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {}
+}
