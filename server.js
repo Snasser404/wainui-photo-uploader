@@ -2,7 +2,8 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createUploadSession, getAuthUrl, exchangeCodeForToken } from './lib/graph.js';
+import { createUploadSession, getAuthUrl, exchangeCodeForToken, getAccessToken } from './lib/graph.js';
+const GRAPH = 'https://graph.microsoft.com/v1.0';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -30,6 +31,7 @@ const MIME = {
 function serveStatic(req, res) {
   let urlPath = decodeURIComponent(req.url.split('?')[0]);
   if (urlPath === '/') urlPath = '/index.html';
+  if (urlPath === '/gallery') urlPath = '/gallery.html';
   const filePath = path.join(PUBLIC_DIR, urlPath);
   if (!filePath.startsWith(PUBLIC_DIR)) return notFound(res);
   fs.stat(filePath, (err, stat) => {
@@ -75,15 +77,75 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ error: 'filename required' }));
       }
-      const subfolder = body.uploaderName
-        ? String(body.uploaderName).slice(0, 60)
-        : new Date().toISOString().slice(0, 10);
-      const session = await createUploadSession({ filename: body.filename, subfolder });
+      const session = await createUploadSession({ filename: body.filename, subfolder: null });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({
         uploadUrl: session.uploadUrl,
         expirationDateTime: session.expirationDateTime,
       }));
+    }
+
+    if (pathname === '/api/set-metadata' && req.method === 'POST') {
+      const body = JSON.parse((await readBody(req)) || '{}');
+      if (!body.itemId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'itemId required' }));
+      }
+      const meta = {
+        caption: (body.caption || '').slice(0, 500),
+        tags: Array.isArray(body.tags) ? body.tags.slice(0, 20) : [],
+        uploader: (body.uploader || '').slice(0, 60),
+        uploadedAt: new Date().toISOString(),
+      };
+      const token = await getAccessToken();
+      const r = await fetch(`${GRAPH}/me/drive/items/${encodeURIComponent(body.itemId)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: JSON.stringify(meta) }),
+      });
+      res.writeHead(r.ok ? 200 : 500, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: r.ok }));
+    }
+
+    if (pathname === '/api/list-photos' && req.method === 'GET') {
+      const token = await getAccessToken();
+      const baseFolder = process.env.ONEDRIVE_FOLDER || 'WaiNui-Uploads';
+      const select = 'id,name,size,createdDateTime,lastModifiedDateTime,description,file,image,video';
+      const photos = [];
+      let next = `${GRAPH}/me/drive/root:/${encodeURIComponent(baseFolder)}:/children?$select=${select}&$expand=thumbnails&$top=200`;
+      let hops = 10;
+      while (next && hops-- > 0) {
+        const r = await fetch(next, { headers: { Authorization: `Bearer ${token}` } });
+        if (!r.ok) { if (r.status === 404) break; throw new Error(`List failed: ${r.status}`); }
+        const data = await r.json();
+        for (const item of data.value || []) {
+          if (!item.file) continue;
+          const mime = item.file.mimeType || '';
+          const isImage = mime.startsWith('image/');
+          const isVideo = mime.startsWith('video/');
+          if (!isImage && !isVideo) continue;
+          let meta = { caption: '', tags: [], uploader: '', uploadedAt: null };
+          if (item.description) {
+            try { meta = { ...meta, ...JSON.parse(item.description) }; } catch {}
+          }
+          const t = (item.thumbnails && item.thumbnails[0]) || {};
+          photos.push({
+            id: item.id, name: item.name, size: item.size,
+            createdAt: item.createdDateTime, modifiedAt: item.lastModifiedDateTime, mime,
+            type: isVideo ? 'video' : 'image',
+            thumbnail: (t.large && t.large.url) || (t.medium && t.medium.url) || null,
+            download: item['@microsoft.graph.downloadUrl'] || null,
+            caption: meta.caption || '',
+            tags: Array.isArray(meta.tags) ? meta.tags : [],
+            uploader: meta.uploader || '',
+            uploadedAt: meta.uploadedAt || item.createdDateTime,
+          });
+        }
+        next = data['@odata.nextLink'] || null;
+      }
+      photos.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ photos }));
     }
 
     if ((pathname === '/auth/start' || pathname === '/api/auth-start') && req.method === 'GET') {

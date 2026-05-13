@@ -9,14 +9,13 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
-    const { filename, uploaderName } = body;
+    const { filename } = body;
     if (!filename) return res.status(400).json({ error: 'filename required' });
 
-    const subfolder = uploaderName
-      ? String(uploaderName).slice(0, 60)
-      : new Date().toISOString().slice(0, 10);
-
-    const session = await createUploadSession({ filename, subfolder });
+    // Flat folder structure — all uploads in one place, simpler for the gallery.
+    // Per-file metadata (caption, tags, uploader) goes into the file's description
+    // via /api/set-metadata after upload, so the gallery can show everything in one feed.
+    const session = await createUploadSession({ filename, subfolder: null });
     res.status(200).json({
       uploadUrl: session.uploadUrl,
       expirationDateTime: session.expirationDateTime,

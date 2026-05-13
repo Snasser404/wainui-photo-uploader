@@ -3,6 +3,8 @@ const pickButton = document.getElementById('pick-button');
 const fileList = document.getElementById('file-list');
 const uploadButton = document.getElementById('upload-button');
 const nameInput = document.getElementById('uploader-name');
+const captionInput = document.getElementById('caption-input');
+const tagsInput = document.getElementById('tags-input');
 
 const stepPick = document.getElementById('step-pick');
 const stepUploading = document.getElementById('step-uploading');
@@ -78,8 +80,13 @@ function putChunk(uploadUrl, blob, start, end, total, onProgress) {
       if (e.lengthComputable) onProgress(start + e.loaded);
     };
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.status);
-      else reject(new Error(`Chunk failed (${xhr.status}): ${xhr.responseText.slice(0, 200)}`));
+      if (xhr.status >= 200 && xhr.status < 300) {
+        let body = null;
+        try { body = xhr.responseText ? JSON.parse(xhr.responseText) : null; } catch {}
+        resolve(body);
+      } else {
+        reject(new Error(`Chunk failed (${xhr.status}): ${xhr.responseText.slice(0, 200)}`));
+      }
     };
     xhr.onerror = () => reject(new Error('Network error during upload'));
     xhr.send(blob);
@@ -90,11 +97,28 @@ async function uploadOneFile(file, uploaderName, onProgress) {
   const uploadUrl = await getUploadUrl(file.name, uploaderName);
   const total = file.size;
   let offset = 0;
+  let lastBody = null;
   while (offset < total) {
     const end = Math.min(offset + CHUNK_SIZE, total);
     const chunk = file.slice(offset, end);
-    await putChunk(uploadUrl, chunk, offset, end, total, onProgress);
+    const body = await putChunk(uploadUrl, chunk, offset, end, total, onProgress);
+    if (body && body.id) lastBody = body;
     offset = end;
+  }
+  return lastBody;
+}
+
+async function saveMetadata(itemId, caption, tags, uploader) {
+  if (!itemId) return;
+  if (!caption && !uploader && (!tags || tags.length === 0)) return;
+  try {
+    await fetch('/api/set-metadata', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemId, caption, tags, uploader }),
+    });
+  } catch (e) {
+    console.warn('metadata save failed', e);
   }
 }
 
@@ -105,6 +129,11 @@ uploadButton.addEventListener('click', async () => {
   progressText.textContent = 'Getting ready...';
 
   const uploaderName = nameInput.value.trim();
+  const caption = (captionInput?.value || '').trim();
+  const tags = (tagsInput?.value || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   const totalBytes = chosenFiles.reduce((s, f) => s + f.size, 0);
   let bytesDoneBefore = 0;
   let succeeded = 0;
@@ -114,11 +143,12 @@ uploadButton.addEventListener('click', async () => {
     const file = chosenFiles[i];
     progressText.textContent = `Sending ${i + 1} of ${chosenFiles.length}: ${file.name}`;
     try {
-      await uploadOneFile(file, uploaderName, (uploadedInThisFile) => {
+      const item = await uploadOneFile(file, uploaderName, (uploadedInThisFile) => {
         const overall = bytesDoneBefore + uploadedInThisFile;
         const pct = Math.min(99, Math.round((overall / totalBytes) * 100));
         progressBar.style.width = pct + '%';
       });
+      if (item?.id) await saveMetadata(item.id, caption, tags, uploaderName);
       succeeded += 1;
     } catch (err) {
       console.error(err);

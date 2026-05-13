@@ -46,6 +46,16 @@
         <input id="uploader-name" type="text" placeholder="Type your name here" autocomplete="name" />
       </label>
 
+      <label class="name-row">
+        <span class="label-text">Caption (optional)</span>
+        <input id="caption-input" type="text" placeholder="e.g. Summer at the lake" maxlength="200" />
+      </label>
+
+      <label class="name-row">
+        <span class="label-text">Tags (optional, separated by commas)</span>
+        <input id="tags-input" type="text" placeholder="e.g. family, vacation, summer" />
+      </label>
+
       <label for="file-input" class="big-button button-blue" id="pick-button">
         <span class="icon" aria-hidden="true">&#128247;</span>
         <span class="button-text">Choose Photos</span>
@@ -77,6 +87,7 @@
       <button id="again-button" class="big-button button-blue">
         <span class="button-text">Send More Photos</span>
       </button>
+      <a href="/gallery" class="link-row">View the Gallery &rarr;</a>
     </section>
 
     <section id="step-error" class="card hidden">
@@ -87,6 +98,10 @@
         <span class="button-text">Try Again</span>
       </button>
     </section>
+
+    <nav class="bottom-nav">
+      <a href="/gallery" class="link-row">View the Gallery &rarr;</a>
+    </nav>
   </main>
 
   <script src="app.js"></script>

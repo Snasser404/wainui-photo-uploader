@@ -2,7 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     { "source": "/auth/start", "destination": "/api/auth-start" },
-    { "source": "/auth/callback", "destination": "/api/auth-callback" }
+    { "source": "/auth/callback", "destination": "/api/auth-callback" },
+    { "source": "/gallery", "destination": "/gallery.html" }
   ],
   "headers": [
     {

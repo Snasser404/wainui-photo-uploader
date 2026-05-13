@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Photo Gallery</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#1565c0" />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+</head>
+<body>
+  <main class="container container-wide">
+    <header class="header">
+      <h1>Photo Gallery</h1>
+      <p class="subtitle">Tap any photo to see it full size.</p>
+    </header>
+
+    <section id="gallery-status" class="card">
+      <p id="status-text">Loading photos…</p>
+    </section>
+
+    <section id="gallery-grid" class="gallery-grid hidden" aria-label="Photo gallery"></section>
+
+    <nav class="bottom-nav">
+      <a href="/" class="link-row">&larr; Send More Photos</a>
+    </nav>
+  </main>
+
+  <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="Photo full size">
+    <button id="lightbox-close" class="lightbox-close" aria-label="Close">&times;</button>
+    <button id="lightbox-prev" class="lightbox-nav lightbox-prev" aria-label="Previous">&#8249;</button>
+    <button id="lightbox-next" class="lightbox-nav lightbox-next" aria-label="Next">&#8250;</button>
+    <div class="lightbox-content">
+      <div id="lightbox-media-wrap" class="lightbox-media-wrap"></div>
+      <div id="lightbox-caption" class="lightbox-caption"></div>
+    </div>
+  </div>
+
+  <script src="gallery.js"></script>
+</body>
+</html>

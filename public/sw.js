@@ -1,9 +1,12 @@
-const CACHE_NAME = 'wainui-v3';
+const CACHE_NAME = 'wainui-v4';
 const ASSETS = [
   '/',
   '/index.html',
+  '/gallery',
+  '/gallery.html',
   '/styles.css',
   '/app.js',
+  '/gallery.js',
   '/manifest.webmanifest',
   '/icon-192.png',
   '/icon-512.png',
@@ -14,7 +17,7 @@ const ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(ASSETS))
+      .then((cache) => cache.addAll(ASSETS.filter((a) => !a.includes('?'))).catch(() => {}))
       .then(() => self.skipWaiting())
   );
 });
@@ -27,8 +30,6 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Network-first for everything in scope. Falls back to cache only when offline.
-// This prevents stale frontend code from sticking around after a deploy.
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
