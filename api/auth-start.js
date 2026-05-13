@@ -1,8 +1,8 @@
-import { getAuthUrl } from '../lib/dropbox.js';
+import { getAuthUrl } from '../lib/graph.js';
 
 export default function handler(req, res) {
-  if (!process.env.DROPBOX_APP_KEY) {
-    return res.status(500).send('DROPBOX_APP_KEY not configured.');
+  if (!process.env.MS_CLIENT_ID) {
+    return res.status(500).send('MS_CLIENT_ID not configured.');
   }
   res.writeHead(302, { Location: getAuthUrl() });
   res.end();

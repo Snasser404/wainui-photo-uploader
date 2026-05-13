@@ -2,7 +2,7 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getAccessToken, getAuthUrl, exchangeCodeForToken, safeName } from './lib/dropbox.js';
+import { createUploadSession, getAuthUrl, exchangeCodeForToken } from './lib/graph.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -24,6 +24,7 @@ const MIME = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.ico': 'image/x-icon',
+  '.webmanifest': 'application/manifest+json',
 };
 
 function serveStatic(req, res) {
@@ -68,23 +69,26 @@ const server = http.createServer(async (req, res) => {
   const pathname = url.pathname;
 
   try {
-    if (pathname === '/api/dropbox-token' && req.method === 'POST') {
+    if (pathname === '/api/upload-session' && req.method === 'POST') {
       const body = JSON.parse((await readBody(req)) || '{}');
-      const accessToken = await getAccessToken();
-      const folder = body.uploaderName
-        ? safeName(body.uploaderName).slice(0, 60)
+      if (!body.filename) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'filename required' }));
+      }
+      const subfolder = body.uploaderName
+        ? String(body.uploaderName).slice(0, 60)
         : new Date().toISOString().slice(0, 10);
+      const session = await createUploadSession({ filename: body.filename, subfolder });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({
-        accessToken,
-        folder: '/' + folder,
-        expiresInSeconds: 14400,
+        uploadUrl: session.uploadUrl,
+        expirationDateTime: session.expirationDateTime,
       }));
     }
 
     if ((pathname === '/auth/start' || pathname === '/api/auth-start') && req.method === 'GET') {
-      if (!process.env.DROPBOX_APP_KEY) {
-        res.writeHead(500); return res.end('DROPBOX_APP_KEY not set');
+      if (!process.env.MS_CLIENT_ID) {
+        res.writeHead(500); return res.end('MS_CLIENT_ID not set');
       }
       res.writeHead(302, { Location: getAuthUrl() });
       return res.end();
@@ -97,8 +101,8 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(`<!doctype html><html><body style="font-family:system-ui;padding:40px;max-width:760px;margin:auto;line-height:1.5">
         <h1>Setup complete</h1>
-        <p>Add this as <code>DROPBOX_REFRESH_TOKEN</code> in your environment, then restart:</p>
-        <textarea readonly style="width:100%;height:80px;font-family:monospace;font-size:12px;padding:10px;border:1px solid #ccc;border-radius:6px">${data.refresh_token}</textarea>
+        <p>Add this as <code>MS_REFRESH_TOKEN</code> in your environment, then restart:</p>
+        <textarea readonly style="width:100%;height:160px;font-family:monospace;font-size:12px;padding:10px;border:1px solid #ccc;border-radius:6px">${data.refresh_token}</textarea>
         <p style="color:#666;margin-top:20px">Keep this private.</p>
       </body></html>`);
     }

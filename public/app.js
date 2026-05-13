@@ -17,12 +17,9 @@ const errorDetail = document.getElementById('error-detail');
 const againButton = document.getElementById('again-button');
 const retryButton = document.getElementById('retry-button');
 
-const SINGLE_UPLOAD_LIMIT = 140 * 1024 * 1024;
-const CHUNK_SIZE = 16 * 1024 * 1024;
-const DROPBOX_UPLOAD = 'https://content.dropboxapi.com/2/files/upload';
-const DROPBOX_SESSION_START = 'https://content.dropboxapi.com/2/files/upload_session/start';
-const DROPBOX_SESSION_APPEND = 'https://content.dropboxapi.com/2/files/upload_session/append_v2';
-const DROPBOX_SESSION_FINISH = 'https://content.dropboxapi.com/2/files/upload_session/finish';
+// OneDrive upload-session chunk size: must be a multiple of 320 KiB
+// (except the last chunk). 5 MiB is a good balance.
+const CHUNK_SIZE = 5 * 1024 * 1024;
 
 let chosenFiles = [];
 
@@ -61,128 +58,44 @@ pickButton.addEventListener('keydown', (e) => {
   }
 });
 
-function asciifyArg(obj) {
-  var re = new RegExp("[\u0080-\uFFFF]", "g");
-  return JSON.stringify(obj).replace(re, function(c) {
-    return "\\u" + ("0000" + c.charCodeAt(0).toString(16)).slice(-4);
-  });
-}
-
-async function getCredentials(uploaderName) {
-  const res = await fetch('/api/dropbox-token', {
+async function getUploadUrl(filename, uploaderName) {
+  const res = await fetch('/api/upload-session', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ uploaderName }),
+    body: JSON.stringify({ filename, uploaderName }),
   });
   if (!res.ok) throw new Error('Could not start upload.');
-  return res.json();
+  const data = await res.json();
+  return data.uploadUrl;
 }
 
-function uploadSingle(file, accessToken, dropboxPath, onProgress) {
+function putChunk(uploadUrl, blob, start, end, total, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', DROPBOX_UPLOAD);
-    xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
-    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-    xhr.setRequestHeader(
-      'Dropbox-API-Arg',
-      asciifyArg({
-        path: dropboxPath,
-        mode: 'add',
-        autorename: true,
-        mute: true,
-        strict_conflict: false,
-      })
-    );
-    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded); };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new Error(`Upload failed (${xhr.status}): ${xhr.responseText.slice(0, 200)}`));
+    xhr.open('PUT', uploadUrl);
+    xhr.setRequestHeader('Content-Range', `bytes ${start}-${end - 1}/${total}`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(start + e.loaded);
     };
-    xhr.onerror = () => reject(new Error('Network error during upload'));
-    xhr.send(file);
-  });
-}
-
-function chunkRequest(url, accessToken, argHeader, blob, onProgress) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', url);
-    xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
-    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-    xhr.setRequestHeader('Dropbox-API-Arg', argHeader);
-    xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded); };
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(xhr.responseText ? JSON.parse(xhr.responseText) : null);
-      } else {
-        reject(new Error(`Chunk failed (${xhr.status}): ${xhr.responseText.slice(0, 200)}`));
-      }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.status);
+      else reject(new Error(`Chunk failed (${xhr.status}): ${xhr.responseText.slice(0, 200)}`));
     };
     xhr.onerror = () => reject(new Error('Network error during upload'));
     xhr.send(blob);
   });
 }
 
-async function uploadChunked(file, accessToken, dropboxPath, onProgress) {
-  let offset = 0;
-  let bytesDoneBefore = 0;
+async function uploadOneFile(file, uploaderName, onProgress) {
+  const uploadUrl = await getUploadUrl(file.name, uploaderName);
   const total = file.size;
-
-  const firstChunk = file.slice(0, Math.min(CHUNK_SIZE, total));
-  const startRes = await chunkRequest(
-    DROPBOX_SESSION_START,
-    accessToken,
-    asciifyArg({ close: false }),
-    firstChunk,
-    (loaded) => onProgress(bytesDoneBefore + loaded)
-  );
-  const sessionId = startRes.session_id;
-  offset = firstChunk.size;
-  bytesDoneBefore = offset;
-
+  let offset = 0;
   while (offset < total) {
     const end = Math.min(offset + CHUNK_SIZE, total);
     const chunk = file.slice(offset, end);
-    const isLast = end === total;
-
-    if (isLast) {
-      await chunkRequest(
-        DROPBOX_SESSION_FINISH,
-        accessToken,
-        asciifyArg({
-          cursor: { session_id: sessionId, offset },
-          commit: {
-            path: dropboxPath,
-            mode: 'add',
-            autorename: true,
-            mute: true,
-            strict_conflict: false,
-          },
-        }),
-        chunk,
-        (loaded) => onProgress(bytesDoneBefore + loaded)
-      );
-    } else {
-      await chunkRequest(
-        DROPBOX_SESSION_APPEND,
-        accessToken,
-        asciifyArg({ cursor: { session_id: sessionId, offset }, close: false }),
-        chunk,
-        (loaded) => onProgress(bytesDoneBefore + loaded)
-      );
-    }
+    await putChunk(uploadUrl, chunk, offset, end, total, onProgress);
     offset = end;
-    bytesDoneBefore = offset;
   }
-}
-
-async function uploadOneFile(file, accessToken, folder, onProgress) {
-  const path = `${folder}/${file.name}`;
-  if (file.size <= SINGLE_UPLOAD_LIMIT) {
-    return uploadSingle(file, accessToken, path, onProgress);
-  }
-  return uploadChunked(file, accessToken, path, onProgress);
 }
 
 uploadButton.addEventListener('click', async () => {
@@ -192,14 +105,6 @@ uploadButton.addEventListener('click', async () => {
   progressText.textContent = 'Getting ready...';
 
   const uploaderName = nameInput.value.trim();
-  let creds;
-  try {
-    creds = await getCredentials(uploaderName);
-  } catch (err) {
-    errorDetail.textContent = 'Could not connect. Please check your internet and try again.';
-    return show(stepError);
-  }
-
   const totalBytes = chosenFiles.reduce((s, f) => s + f.size, 0);
   let bytesDoneBefore = 0;
   let succeeded = 0;
@@ -209,7 +114,7 @@ uploadButton.addEventListener('click', async () => {
     const file = chosenFiles[i];
     progressText.textContent = `Sending ${i + 1} of ${chosenFiles.length}: ${file.name}`;
     try {
-      await uploadOneFile(file, creds.accessToken, creds.folder, (uploadedInThisFile) => {
+      await uploadOneFile(file, uploaderName, (uploadedInThisFile) => {
         const overall = bytesDoneBefore + uploadedInThisFile;
         const pct = Math.min(99, Math.round((overall / totalBytes) * 100));
         progressBar.style.width = pct + '%';

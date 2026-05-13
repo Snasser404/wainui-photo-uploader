@@ -1,4 +1,4 @@
-import { getAccessToken, safeName } from '../lib/dropbox.js';
+import { createUploadSession } from '../lib/graph.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -9,18 +9,20 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
-    const accessToken = await getAccessToken();
-    const folder = body.uploaderName
-      ? safeName(body.uploaderName).slice(0, 60)
+    const { filename, uploaderName } = body;
+    if (!filename) return res.status(400).json({ error: 'filename required' });
+
+    const subfolder = uploaderName
+      ? String(uploaderName).slice(0, 60)
       : new Date().toISOString().slice(0, 10);
 
+    const session = await createUploadSession({ filename, subfolder });
     res.status(200).json({
-      accessToken,
-      folder: '/' + folder,
-      expiresInSeconds: 14400,
+      uploadUrl: session.uploadUrl,
+      expirationDateTime: session.expirationDateTime,
     });
   } catch (err) {
-    console.error('dropbox-token error:', err.message);
-    res.status(500).json({ error: 'Could not get upload token.' });
+    console.error('upload-session error:', err.message);
+    res.status(500).json({ error: 'Could not start upload.' });
   }
 }
