@@ -10,18 +10,18 @@
   <link rel="icon" type="image/svg+xml" href="/icon.svg" />
   <link rel="apple-touch-icon" href="/icon-192.png" />
 </head>
-<body>
+<body class="gallery-body">
   <main class="container container-wide">
-    <header class="header">
+    <header class="header gallery-header">
       <h1>Photo Gallery</h1>
-      <p class="subtitle">Tap any photo to see it full size.</p>
+      <p id="gallery-count" class="subtitle">Loading photos&hellip;</p>
     </header>
 
-    <section id="gallery-status" class="card">
-      <p id="status-text">Loading photos…</p>
+    <section id="gallery-status" class="card status-card">
+      <p id="status-text">Loading photos&hellip;</p>
     </section>
 
-    <section id="gallery-grid" class="gallery-grid hidden" aria-label="Photo gallery"></section>
+    <section id="gallery-sections" class="gallery-sections hidden" aria-label="Photo gallery"></section>
 
     <nav class="bottom-nav">
       <a href="/" class="link-row">&larr; Send More Photos</a>
@@ -32,10 +32,9 @@
     <button id="lightbox-close" class="lightbox-close" aria-label="Close">&times;</button>
     <button id="lightbox-prev" class="lightbox-nav lightbox-prev" aria-label="Previous">&#8249;</button>
     <button id="lightbox-next" class="lightbox-nav lightbox-next" aria-label="Next">&#8250;</button>
-    <div class="lightbox-content">
-      <div id="lightbox-media-wrap" class="lightbox-media-wrap"></div>
-      <div id="lightbox-caption" class="lightbox-caption"></div>
-    </div>
+    <div id="lightbox-counter" class="lightbox-counter"></div>
+    <div id="lightbox-media-wrap" class="lightbox-media-wrap"></div>
+    <div id="lightbox-info" class="lightbox-info"></div>
   </div>
 
   <script src="gallery.js"></script>

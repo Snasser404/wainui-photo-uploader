@@ -9,13 +9,16 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
-    const { filename } = body;
+    const { filename, uploaderName } = body;
     if (!filename) return res.status(400).json({ error: 'filename required' });
 
-    // Flat folder structure — all uploads in one place, simpler for the gallery.
-    // Per-file metadata (caption, tags, uploader) goes into the file's description
-    // via /api/set-metadata after upload, so the gallery can show everything in one feed.
-    const session = await createUploadSession({ filename, subfolder: null });
+    // Each member's uploads land in their own subfolder so OneDrive stays organized.
+    // If they didn't type a name, file goes into an "Anonymous" subfolder.
+    const subfolder = uploaderName
+      ? String(uploaderName).trim().slice(0, 60)
+      : 'Anonymous';
+
+    const session = await createUploadSession({ filename, subfolder });
     res.status(200).json({
       uploadUrl: session.uploadUrl,
       expirationDateTime: session.expirationDateTime,

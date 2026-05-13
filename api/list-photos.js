@@ -36,6 +36,57 @@ function pickThumbnail(thumbs) {
   return (t.large && t.large.url) || (t.medium && t.medium.url) || (t.small && t.small.url) || null;
 }
 
+function buildPhotoEntry(item, folderUploader) {
+  if (!item.file) return null;
+  const mime = item.file.mimeType || '';
+  const isImage = mime.startsWith('image/');
+  const isVideo = mime.startsWith('video/');
+  if (!isImage && !isVideo) return null;
+
+  const meta = parseDescription(item.description);
+  return {
+    id: item.id,
+    name: item.name,
+    size: item.size,
+    createdAt: item.createdDateTime,
+    modifiedAt: item.lastModifiedDateTime,
+    mime,
+    type: isVideo ? 'video' : 'image',
+    thumbnail: pickThumbnail(item.thumbnails),
+    download: item['@microsoft.graph.downloadUrl'] || null,
+    caption: meta.caption,
+    tags: meta.tags,
+    // Fall back to the subfolder name as the uploader if no metadata was stored.
+    uploader: meta.uploader || folderUploader || '',
+    uploadedAt: meta.uploadedAt || item.createdDateTime,
+  };
+}
+
+async function listFolder(token, encodedPath) {
+  const photos = [];
+  const subfolders = [];
+  let next = `${GRAPH}/me/drive/root:/${encodedPath}:/children?$expand=thumbnails&$top=200`;
+  let safetyHops = 10;
+  while (next && safetyHops-- > 0) {
+    const r = await fetch(next, { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) {
+      if (r.status === 404) return { photos, subfolders };
+      throw new Error(`List failed (${encodedPath}): ${r.status} ${await r.text()}`);
+    }
+    const data = await r.json();
+    for (const item of data.value || []) {
+      if (item.folder) {
+        subfolders.push(item);
+      } else {
+        const entry = buildPhotoEntry(item, null);
+        if (entry) photos.push(entry);
+      }
+    }
+    next = data['@odata.nextLink'] || null;
+  }
+  return { photos, subfolders };
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -45,49 +96,27 @@ export default async function handler(req, res) {
   try {
     const token = await getAccessToken();
     const baseFolder = process.env.ONEDRIVE_FOLDER || 'WaiNui-Uploads';
-    const photos = [];
-    // Use plain children listing (no $select) so @microsoft.graph.downloadUrl is included.
-    let nextLink = `${GRAPH}/me/drive/root:/${encodeURIComponent(baseFolder)}:/children?$expand=thumbnails&$top=200`;
+    const allPhotos = [];
 
-    let safetyHops = 10;
-    while (nextLink && safetyHops-- > 0) {
-      const r = await fetch(nextLink, { headers: { Authorization: `Bearer ${token}` } });
-      if (!r.ok) {
-        if (r.status === 404) break;
-        throw new Error(`List failed: ${r.status} ${await r.text()}`);
-      }
-      const data = await r.json();
-      for (const item of data.value || []) {
-        if (!item.file) continue;
-        const mime = item.file.mimeType || '';
-        const isImage = mime.startsWith('image/');
-        const isVideo = mime.startsWith('video/');
-        if (!isImage && !isVideo) continue;
+    // Level 0: photos directly under base (legacy flat uploads stay visible).
+    const root = await listFolder(token, encodeURIComponent(baseFolder));
+    allPhotos.push(...root.photos);
 
-        const meta = parseDescription(item.description);
-        photos.push({
-          id: item.id,
-          name: item.name,
-          size: item.size,
-          createdAt: item.createdDateTime,
-          modifiedAt: item.lastModifiedDateTime,
-          mime,
-          type: isVideo ? 'video' : 'image',
-          thumbnail: pickThumbnail(item.thumbnails),
-          download: item['@microsoft.graph.downloadUrl'] || null,
-          caption: meta.caption,
-          tags: meta.tags,
-          uploader: meta.uploader,
-          uploadedAt: meta.uploadedAt || item.createdDateTime,
-        });
+    // Level 1: each subfolder = one uploader. The folder name acts as a fallback
+    // uploader when a file has no JSON metadata yet.
+    for (const sub of root.subfolders) {
+      const path = `${baseFolder}/${sub.name}`;
+      const inside = await listFolder(token, path.split('/').map(encodeURIComponent).join('/'));
+      for (const entry of inside.photos) {
+        if (!entry.uploader) entry.uploader = sub.name;
+        allPhotos.push(entry);
       }
-      nextLink = data['@odata.nextLink'] || null;
     }
 
-    photos.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+    allPhotos.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
 
     res.setHeader('Cache-Control', 'public, max-age=60');
-    res.status(200).json({ photos });
+    res.status(200).json({ photos: allPhotos });
   } catch (err) {
     console.error('list-photos error:', err.message);
     res.status(500).json({ error: 'Could not load gallery.' });
