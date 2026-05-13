@@ -40,22 +40,32 @@ function renderGrid() {
     .map((p, i) => {
       const thumb = p.thumbnail || p.download || '';
       const isVideo = p.type === 'video';
+      const hasUploader = !!p.uploader;
+      const hasDate = !!p.uploadedAt;
+      const hasInfo = p.caption || hasUploader || hasDate || (p.tags && p.tags.length);
       return `
         <button type="button" class="thumb" data-index="${i}" aria-label="${escapeHtml(p.caption || p.name)}">
-          ${thumb
-            ? `<img class="thumb-img" loading="lazy" src="${escapeHtml(thumb)}" alt="${escapeHtml(p.caption || p.name)}" />`
-            : `<div class="thumb-placeholder">${isVideo ? '&#9658;' : '&#128247;'}</div>`}
-          ${isVideo ? '<span class="thumb-play" aria-hidden="true">&#9658;</span>' : ''}
-          <div class="thumb-overlay">
-            ${p.caption ? `<div class="thumb-caption">${escapeHtml(p.caption)}</div>` : ''}
-            <div class="thumb-meta">
-              ${p.uploader ? `<span>${escapeHtml(p.uploader)}</span>` : ''}
-              <span>${formatDate(p.uploadedAt)}</span>
-            </div>
-            ${p.tags && p.tags.length
-              ? `<div class="thumb-tags">${p.tags.slice(0, 5).map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>`
-              : ''}
-          </div>
+          <span class="thumb-image-wrap">
+            ${thumb
+              ? `<img class="thumb-img" loading="lazy" src="${escapeHtml(thumb)}" alt="${escapeHtml(p.caption || p.name)}" />`
+              : `<span class="thumb-placeholder">${isVideo ? '&#9658;' : '&#128247;'}</span>`}
+            ${isVideo ? '<span class="thumb-play" aria-hidden="true">&#9658;</span>' : ''}
+          </span>
+          ${hasInfo ? `
+            <span class="thumb-info">
+              ${p.caption ? `<span class="thumb-caption">${escapeHtml(p.caption)}</span>` : ''}
+              ${hasUploader || hasDate ? `
+                <span class="thumb-meta">
+                  ${hasUploader ? `<span class="thumb-uploader">${escapeHtml(p.uploader)}</span>` : ''}
+                  ${hasUploader && hasDate ? '<span class="sep">&middot;</span>' : ''}
+                  ${hasDate ? `<span class="thumb-date">${formatDate(p.uploadedAt)}</span>` : ''}
+                </span>
+              ` : ''}
+              ${p.tags && p.tags.length
+                ? `<span class="thumb-tags">${p.tags.slice(0, 8).map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</span>`
+                : ''}
+            </span>
+          ` : ''}
         </button>
       `;
     })

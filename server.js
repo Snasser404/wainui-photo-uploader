@@ -108,11 +108,15 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/list-photos' && req.method === 'GET') {
+      const decodeHtml = (s) => !s ? '' : String(s)
+        .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+        .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
+        .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
       const token = await getAccessToken();
       const baseFolder = process.env.ONEDRIVE_FOLDER || 'WaiNui-Uploads';
-      const select = 'id,name,size,createdDateTime,lastModifiedDateTime,description,file,image,video';
       const photos = [];
-      let next = `${GRAPH}/me/drive/root:/${encodeURIComponent(baseFolder)}:/children?$select=${select}&$expand=thumbnails&$top=200`;
+      let next = `${GRAPH}/me/drive/root:/${encodeURIComponent(baseFolder)}:/children?$expand=thumbnails&$top=200`;
       let hops = 10;
       while (next && hops-- > 0) {
         const r = await fetch(next, { headers: { Authorization: `Bearer ${token}` } });
@@ -126,7 +130,7 @@ const server = http.createServer(async (req, res) => {
           if (!isImage && !isVideo) continue;
           let meta = { caption: '', tags: [], uploader: '', uploadedAt: null };
           if (item.description) {
-            try { meta = { ...meta, ...JSON.parse(item.description) }; } catch {}
+            try { meta = { ...meta, ...JSON.parse(decodeHtml(item.description)) }; } catch {}
           }
           const t = (item.thumbnails && item.thumbnails[0]) || {};
           photos.push({

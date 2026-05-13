@@ -2,10 +2,23 @@ import { getAccessToken } from '../lib/graph.js';
 
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 
+function decodeHtml(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
 function parseDescription(desc) {
   if (!desc) return { caption: '', tags: [], uploader: '', uploadedAt: null };
+  const decoded = decodeHtml(desc);
   try {
-    const parsed = JSON.parse(desc);
+    const parsed = JSON.parse(decoded);
     return {
       caption: parsed.caption || '',
       tags: Array.isArray(parsed.tags) ? parsed.tags : [],
@@ -13,14 +26,14 @@ function parseDescription(desc) {
       uploadedAt: parsed.uploadedAt || null,
     };
   } catch {
-    return { caption: desc, tags: [], uploader: '', uploadedAt: null };
+    return { caption: decoded, tags: [], uploader: '', uploadedAt: null };
   }
 }
 
-function pickThumbnail(thumbs, prefer) {
+function pickThumbnail(thumbs) {
   if (!thumbs || !thumbs.length) return null;
   const t = thumbs[0];
-  return (t[prefer] && t[prefer].url) || (t.large && t.large.url) || (t.medium && t.medium.url) || (t.small && t.small.url) || null;
+  return (t.large && t.large.url) || (t.medium && t.medium.url) || (t.small && t.small.url) || null;
 }
 
 export default async function handler(req, res) {
@@ -32,10 +45,9 @@ export default async function handler(req, res) {
   try {
     const token = await getAccessToken();
     const baseFolder = process.env.ONEDRIVE_FOLDER || 'WaiNui-Uploads';
-    const select = 'id,name,size,createdDateTime,lastModifiedDateTime,description,file,image,video';
-
     const photos = [];
-    let nextLink = `${GRAPH}/me/drive/root:/${encodeURIComponent(baseFolder)}:/children?$select=${select}&$expand=thumbnails&$top=200`;
+    // Use plain children listing (no $select) so @microsoft.graph.downloadUrl is included.
+    let nextLink = `${GRAPH}/me/drive/root:/${encodeURIComponent(baseFolder)}:/children?$expand=thumbnails&$top=200`;
 
     let safetyHops = 10;
     while (nextLink && safetyHops-- > 0) {
@@ -61,7 +73,7 @@ export default async function handler(req, res) {
           modifiedAt: item.lastModifiedDateTime,
           mime,
           type: isVideo ? 'video' : 'image',
-          thumbnail: pickThumbnail(item.thumbnails, 'large'),
+          thumbnail: pickThumbnail(item.thumbnails),
           download: item['@microsoft.graph.downloadUrl'] || null,
           caption: meta.caption,
           tags: meta.tags,
