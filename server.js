@@ -153,22 +153,28 @@ const server = http.createServer(async (req, res) => {
         }
         return out;
       };
+      const limit = Math.min(Number(url.searchParams.get('limit')) || 500, 1000);
       const token = await getAccessToken();
       const baseFolder = process.env.ONEDRIVE_FOLDER || 'WaiNui-Uploads';
       const allPhotos = [];
       const root = await listFolder(token, encodeURIComponent(baseFolder));
       allPhotos.push(...root.photos);
-      for (const sub of root.subfolders) {
+      const subResults = await Promise.all(root.subfolders.map(async (sub) => {
         const path = `${baseFolder}/${sub.name}`.split('/').map(encodeURIComponent).join('/');
         const inside = await listFolder(token, path);
-        for (const e of inside.photos) {
+        return { sub, photos: inside.photos };
+      }));
+      for (const { sub, photos } of subResults) {
+        for (const e of photos) {
           if (!e.uploader) e.uploader = sub.name;
           allPhotos.push(e);
         }
       }
       allPhotos.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+      const total = allPhotos.length;
+      const sliced = allPhotos.slice(0, limit);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ photos: allPhotos }));
+      return res.end(JSON.stringify({ photos: sliced, total, returned: sliced.length, limit }));
     }
 
     if ((pathname === '/auth/start' || pathname === '/api/auth-start') && req.method === 'GET') {

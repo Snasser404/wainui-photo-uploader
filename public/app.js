@@ -139,9 +139,10 @@ uploadButton.addEventListener('click', async () => {
   let succeeded = 0;
   let failed = 0;
 
+  const noun = chosenFiles.length === 1 ? 'file' : 'files';
   for (let i = 0; i < chosenFiles.length; i++) {
     const file = chosenFiles[i];
-    progressText.textContent = `Sending ${i + 1} of ${chosenFiles.length}: ${file.name}`;
+    progressText.textContent = `Sending ${i + 1} of ${chosenFiles.length} ${noun}: ${file.name}`;
     try {
       const item = await uploadOneFile(file, uploaderName, (uploadedInThisFile) => {
         const overall = bytesDoneBefore + uploadedInThisFile;
@@ -159,15 +160,16 @@ uploadButton.addEventListener('click', async () => {
 
   progressBar.style.width = '100%';
 
+  const noun2 = succeeded === 1 ? 'file' : 'files';
   if (succeeded > 0 && failed === 0) {
     doneDetail.textContent =
-      succeeded === 1 ? 'We received 1 photo.' : `We received all ${succeeded} photos.`;
+      succeeded === 1 ? 'We received 1 file.' : `We received all ${succeeded} files.`;
     show(stepDone);
   } else if (succeeded > 0) {
-    doneDetail.textContent = `We received ${succeeded} of ${chosenFiles.length} photos. The rest did not send. You can try again.`;
+    doneDetail.textContent = `We received ${succeeded} of ${chosenFiles.length} ${noun2}. The rest did not send. You can try again.`;
     show(stepDone);
   } else {
-    errorDetail.textContent = 'Your photos could not be sent. Please check your internet and try again.';
+    errorDetail.textContent = 'Your files could not be sent. Please check your internet and try again.';
     show(stepError);
   }
 });

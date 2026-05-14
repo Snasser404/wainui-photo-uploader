@@ -68,7 +68,7 @@ function groupByDate(list) {
 
 function renderGallery() {
   if (photos.length === 0) {
-    statusText.textContent = 'No photos yet. Be the first to share one!';
+    statusText.textContent = 'Nothing here yet. Be the first to share a photo or video!';
     countEl.textContent = 'Empty gallery';
     return;
   }
