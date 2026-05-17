@@ -77,8 +77,9 @@ function buildEntry(item, folderUploader) {
 async function listFolder(token, encodedPath) {
   const photos = [];
   const subfolders = [];
-  const select = 'id,name,size,createdDateTime,lastModifiedDateTime,description,file,image,video,photo';
-  let next = `${GRAPH}/me/drive/root:/${encodedPath}:/children?$select=${select}&$expand=thumbnails&$top=200`;
+  // No $select — Graph's default response includes file, image, video, photo facets
+  // and the downloadUrl annotation, which we all need.
+  let next = `${GRAPH}/me/drive/root:/${encodedPath}:/children?$expand=thumbnails&$top=200`;
   let safetyHops = 10;
   while (next && safetyHops-- > 0) {
     const r = await fetch(next, { headers: { Authorization: `Bearer ${token}` } });

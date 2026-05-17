@@ -146,8 +146,7 @@ const server = http.createServer(async (req, res) => {
       };
       const listFolder = async (token, encodedPath) => {
         const out = { photos: [], subfolders: [] };
-        const select = 'id,name,size,createdDateTime,lastModifiedDateTime,description,file,image,video,photo';
-        let next = `${GRAPH}/me/drive/root:/${encodedPath}:/children?$select=${select}&$expand=thumbnails&$top=200`;
+        let next = `${GRAPH}/me/drive/root:/${encodedPath}:/children?$expand=thumbnails&$top=200`;
         let hops = 10;
         while (next && hops-- > 0) {
           const r = await fetch(next, { headers: { Authorization: `Bearer ${token}` } });
