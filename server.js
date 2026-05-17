@@ -77,7 +77,9 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ error: 'filename required' }));
       }
-      const subfolder = body.uploaderName ? String(body.uploaderName).trim().slice(0, 60) : 'Anonymous';
+      const ms = body.takenAt ? Date.parse(body.takenAt) : Date.now();
+      const d = new Date(Number.isNaN(ms) ? Date.now() : ms);
+      const subfolder = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
       const session = await createUploadSession({ filename: body.filename, subfolder });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({
@@ -114,6 +116,11 @@ const server = http.createServer(async (req, res) => {
         .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
         .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
         .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      const DATE_RE = /^\d{4}-\d{2}$/;
+      const pickTaken = (item, fallback) =>
+        (item.photo && item.photo.takenDateTime) ||
+        (item.video && item.video.mediaCreatedDateTime) ||
+        fallback || item.createdDateTime;
       const toEntry = (item, folderUploader) => {
         if (!item.file) return null;
         const mime = item.file.mimeType || '';
@@ -126,20 +133,21 @@ const server = http.createServer(async (req, res) => {
         }
         const t = (item.thumbnails && item.thumbnails[0]) || {};
         return {
-          id: item.id, name: item.name, size: item.size,
-          createdAt: item.createdDateTime, modifiedAt: item.lastModifiedDateTime, mime,
+          id: item.id, name: item.name, size: item.size, mime,
           type: isVideo ? 'video' : 'image',
           thumbnail: (t.large && t.large.url) || (t.medium && t.medium.url) || null,
           download: item['@microsoft.graph.downloadUrl'] || null,
           caption: meta.caption || '',
           tags: Array.isArray(meta.tags) ? meta.tags : [],
           uploader: meta.uploader || folderUploader || '',
+          takenAt: pickTaken(item, meta.uploadedAt),
           uploadedAt: meta.uploadedAt || item.createdDateTime,
         };
       };
       const listFolder = async (token, encodedPath) => {
         const out = { photos: [], subfolders: [] };
-        let next = `${GRAPH}/me/drive/root:/${encodedPath}:/children?$expand=thumbnails&$top=200`;
+        const select = 'id,name,size,createdDateTime,lastModifiedDateTime,description,file,image,video,photo';
+        let next = `${GRAPH}/me/drive/root:/${encodedPath}:/children?$select=${select}&$expand=thumbnails&$top=200`;
         let hops = 10;
         while (next && hops-- > 0) {
           const r = await fetch(next, { headers: { Authorization: `Bearer ${token}` } });
@@ -165,12 +173,13 @@ const server = http.createServer(async (req, res) => {
         return { sub, photos: inside.photos };
       }));
       for (const { sub, photos } of subResults) {
+        const folderUploader = DATE_RE.test(sub.name) ? '' : sub.name;
         for (const e of photos) {
-          if (!e.uploader) e.uploader = sub.name;
+          if (!e.uploader) e.uploader = folderUploader;
           allPhotos.push(e);
         }
       }
-      allPhotos.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+      allPhotos.sort((a, b) => new Date(b.takenAt) - new Date(a.takenAt));
       const total = allPhotos.length;
       const sliced = allPhotos.slice(0, limit);
       res.writeHead(200, { 'Content-Type': 'application/json' });

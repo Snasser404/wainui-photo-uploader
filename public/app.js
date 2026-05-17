@@ -60,11 +60,11 @@ pickButton.addEventListener('keydown', (e) => {
   }
 });
 
-async function getUploadUrl(filename, uploaderName) {
+async function getUploadUrl(filename, takenAt) {
   const res = await fetch('/api/upload-session', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filename, uploaderName }),
+    body: JSON.stringify({ filename, takenAt }),
   });
   if (!res.ok) throw new Error('Could not start upload.');
   const data = await res.json();
@@ -94,7 +94,10 @@ function putChunk(uploadUrl, blob, start, end, total, onProgress) {
 }
 
 async function uploadOneFile(file, uploaderName, onProgress) {
-  const uploadUrl = await getUploadUrl(file.name, uploaderName);
+  const takenAt = file.lastModified
+    ? new Date(file.lastModified).toISOString()
+    : new Date().toISOString();
+  const uploadUrl = await getUploadUrl(file.name, takenAt);
   const total = file.size;
   let offset = 0;
   let lastBody = null;

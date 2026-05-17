@@ -2,6 +2,7 @@ import { getAccessToken } from '../lib/graph.js';
 
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 const DEFAULT_LIMIT = 500;
+const DATE_FOLDER_RE = /^\d{4}-\d{2}$/;
 
 function decodeHtml(s) {
   if (!s) return '';
@@ -37,6 +38,16 @@ function pickThumbnail(thumbs) {
   return (t.large && t.large.url) || (t.medium && t.medium.url) || (t.small && t.small.url) || null;
 }
 
+function pickTakenAt(item, fallback) {
+  // Prefer the date the photo/video was actually captured, fall back to upload time.
+  return (
+    (item.photo && item.photo.takenDateTime) ||
+    (item.video && item.video.mediaCreatedDateTime) ||
+    fallback ||
+    item.createdDateTime
+  );
+}
+
 function buildEntry(item, folderUploader) {
   if (!item.file) return null;
   const mime = item.file.mimeType || '';
@@ -45,12 +56,12 @@ function buildEntry(item, folderUploader) {
   if (!isImage && !isVideo) return null;
 
   const meta = parseDescription(item.description);
+  const takenAt = pickTakenAt(item, meta.uploadedAt);
+
   return {
     id: item.id,
     name: item.name,
     size: item.size,
-    createdAt: item.createdDateTime,
-    modifiedAt: item.lastModifiedDateTime,
     mime,
     type: isVideo ? 'video' : 'image',
     thumbnail: pickThumbnail(item.thumbnails),
@@ -58,6 +69,7 @@ function buildEntry(item, folderUploader) {
     caption: meta.caption,
     tags: meta.tags,
     uploader: meta.uploader || folderUploader || '',
+    takenAt,
     uploadedAt: meta.uploadedAt || item.createdDateTime,
   };
 }
@@ -65,7 +77,8 @@ function buildEntry(item, folderUploader) {
 async function listFolder(token, encodedPath) {
   const photos = [];
   const subfolders = [];
-  let next = `${GRAPH}/me/drive/root:/${encodedPath}:/children?$expand=thumbnails&$top=200`;
+  const select = 'id,name,size,createdDateTime,lastModifiedDateTime,description,file,image,video,photo';
+  let next = `${GRAPH}/me/drive/root:/${encodedPath}:/children?$select=${select}&$expand=thumbnails&$top=200`;
   let safetyHops = 10;
   while (next && safetyHops-- > 0) {
     const r = await fetch(next, { headers: { Authorization: `Bearer ${token}` } });
@@ -95,11 +108,9 @@ export default async function handler(req, res) {
     const baseFolder = process.env.ONEDRIVE_FOLDER || 'WaiNui-Uploads';
     const allPhotos = [];
 
-    // Root listing first to discover subfolders + capture any flat-root files.
     const root = await listFolder(token, encodeURIComponent(baseFolder));
     allPhotos.push(...root.photos);
 
-    // Fetch every uploader's subfolder in parallel — much faster than serial.
     const subResults = await Promise.all(
       root.subfolders.map(async (sub) => {
         const path = `${baseFolder}/${sub.name}`.split('/').map(encodeURIComponent).join('/');
@@ -109,13 +120,16 @@ export default async function handler(req, res) {
     );
 
     for (const { sub, photos } of subResults) {
+      // Folder name is only a useful uploader fallback when it isn't a YYYY-MM date folder.
+      const folderUploader = DATE_FOLDER_RE.test(sub.name) ? '' : sub.name;
       for (const entry of photos) {
-        if (!entry.uploader) entry.uploader = sub.name;
+        if (!entry.uploader) entry.uploader = folderUploader;
         allPhotos.push(entry);
       }
     }
 
-    allPhotos.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+    // Sort by date taken, newest first.
+    allPhotos.sort((a, b) => new Date(b.takenAt) - new Date(a.takenAt));
     const total = allPhotos.length;
     const photos = allPhotos.slice(0, limit);
 

@@ -2,17 +2,21 @@ const statusText = document.getElementById('status-text');
 const statusCard = document.getElementById('gallery-status');
 const sectionsEl = document.getElementById('gallery-sections');
 const countEl = document.getElementById('gallery-count');
+const tagFiltersEl = document.getElementById('tag-filters');
 
 const lightbox = document.getElementById('lightbox');
 const lightboxClose = document.getElementById('lightbox-close');
+const lightboxDownload = document.getElementById('lightbox-download');
 const lightboxPrev = document.getElementById('lightbox-prev');
 const lightboxNext = document.getElementById('lightbox-next');
 const lightboxMediaWrap = document.getElementById('lightbox-media-wrap');
 const lightboxInfo = document.getElementById('lightbox-info');
 const lightboxCounter = document.getElementById('lightbox-counter');
 
-let photos = [];
+let allPhotos = [];
+let visiblePhotos = [];
 let currentIndex = -1;
+let activeTag = null;
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({
@@ -20,11 +24,7 @@ function escapeHtml(s) {
   }[c]));
 }
 
-function startOfDay(d) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x.getTime();
-}
+function startOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); }
 
 function groupLabel(iso) {
   if (!iso) return 'Earlier';
@@ -41,9 +41,8 @@ function groupLabel(iso) {
 
 function shortDate(iso) {
   if (!iso) return '';
-  try {
-    return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  } catch { return ''; }
+  try { return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
+  catch { return ''; }
 }
 
 function fullDate(iso) {
@@ -56,18 +55,34 @@ function fullDate(iso) {
   } catch { return ''; }
 }
 
-function groupByDate(list) {
-  const groups = new Map();
-  for (const p of list) {
-    const key = groupLabel(p.uploadedAt);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(p);
+function applyFilter() {
+  visiblePhotos = activeTag
+    ? allPhotos.filter((p) => Array.isArray(p.tags) && p.tags.includes(activeTag))
+    : allPhotos;
+}
+
+function renderTagFilters() {
+  const counts = new Map();
+  for (const p of allPhotos) {
+    for (const t of p.tags || []) counts.set(t, (counts.get(t) || 0) + 1);
   }
-  return groups;
+  if (counts.size === 0) {
+    tagFiltersEl.classList.add('hidden');
+    return;
+  }
+  tagFiltersEl.classList.remove('hidden');
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const html = [
+    `<button type="button" class="chip ${activeTag === null ? 'chip-active' : ''}" data-tag="">All <span class="chip-count">${allPhotos.length}</span></button>`,
+    ...sorted.map(([tag, count]) =>
+      `<button type="button" class="chip ${activeTag === tag ? 'chip-active' : ''}" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)} <span class="chip-count">${count}</span></button>`
+    ),
+  ];
+  tagFiltersEl.innerHTML = html.join('');
 }
 
 function renderGallery() {
-  if (photos.length === 0) {
+  if (allPhotos.length === 0) {
     statusText.textContent = 'Nothing here yet. Be the first to share a photo or video!';
     countEl.textContent = 'Empty gallery';
     return;
@@ -75,16 +90,32 @@ function renderGallery() {
   statusCard.classList.add('hidden');
   sectionsEl.classList.remove('hidden');
 
-  const totalImg = photos.filter((p) => p.type === 'image').length;
-  const totalVid = photos.length - totalImg;
+  applyFilter();
+
+  const totalImg = visiblePhotos.filter((p) => p.type === 'image').length;
+  const totalVid = visiblePhotos.length - totalImg;
   const parts = [];
   if (totalImg) parts.push(`${totalImg} photo${totalImg === 1 ? '' : 's'}`);
   if (totalVid) parts.push(`${totalVid} video${totalVid === 1 ? '' : 's'}`);
-  countEl.textContent = parts.join(' · ');
+  countEl.textContent = activeTag
+    ? `${parts.join(' · ')} tagged "${activeTag}"`
+    : parts.join(' · ') || '0 items';
 
-  const groups = groupByDate(photos);
+  renderTagFilters();
+
+  if (visiblePhotos.length === 0) {
+    sectionsEl.innerHTML = `<p class="empty-filter">No items match this tag.</p>`;
+    return;
+  }
+
+  const groups = new Map();
+  for (const p of visiblePhotos) {
+    const key = groupLabel(p.takenAt || p.uploadedAt);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(p);
+  }
+
   let runningIndex = 0;
-
   sectionsEl.innerHTML = '';
   for (const [label, items] of groups) {
     const section = document.createElement('section');
@@ -97,6 +128,7 @@ function renderGallery() {
           const thumb = p.thumbnail || p.download || '';
           const isVideo = p.type === 'video';
           const hasOverlay = p.caption || p.uploader;
+          const when = p.takenAt || p.uploadedAt;
           return `
             <button type="button" class="tile" data-index="${idx}" aria-label="${escapeHtml(p.caption || p.name)}">
               <div class="tile-img-wrap">
@@ -109,12 +141,12 @@ function renderGallery() {
                     ${p.caption ? `<div class="tile-caption">${escapeHtml(p.caption)}</div>` : ''}
                     <div class="tile-meta">
                       ${p.uploader ? `<span class="tile-uploader">${escapeHtml(p.uploader)}</span>` : ''}
-                      <span class="tile-date">${escapeHtml(shortDate(p.uploadedAt))}</span>
+                      <span class="tile-date">${escapeHtml(shortDate(when))}</span>
                     </div>
                   </div>
                 ` : `
                   <div class="tile-overlay tile-overlay-bare">
-                    <span class="tile-date">${escapeHtml(shortDate(p.uploadedAt))}</span>
+                    <span class="tile-date">${escapeHtml(shortDate(when))}</span>
                   </div>
                 `}
               </div>
@@ -127,9 +159,20 @@ function renderGallery() {
   }
 }
 
+// ---------- Fullscreen helpers ----------
+function requestFs(el) {
+  const fn = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+  if (fn) { try { fn.call(el).catch(() => {}); } catch {} }
+}
+function exitFs() {
+  const fn = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+  const has = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+  if (fn && has) { try { fn.call(document).catch(() => {}); } catch {} }
+}
+
 function openLightbox(index) {
   currentIndex = index;
-  const p = photos[index];
+  const p = visiblePhotos[index];
   if (!p) return;
 
   lightboxMediaWrap.innerHTML = '';
@@ -154,39 +197,73 @@ function openLightbox(index) {
     lightboxMediaWrap.appendChild(msg);
   }
 
+  if (p.download) {
+    lightboxDownload.href = p.download;
+    lightboxDownload.setAttribute('download', p.name || '');
+    lightboxDownload.style.display = '';
+  } else {
+    lightboxDownload.style.display = 'none';
+  }
+
   const parts = [];
   if (p.caption) parts.push(`<div class="lb-caption">${escapeHtml(p.caption)}</div>`);
   const subParts = [];
   if (p.uploader) subParts.push(`<span class="lb-uploader">${escapeHtml(p.uploader)}</span>`);
-  if (p.uploadedAt) subParts.push(`<span class="lb-date">${escapeHtml(fullDate(p.uploadedAt))}</span>`);
+  const when = p.takenAt || p.uploadedAt;
+  if (when) subParts.push(`<span class="lb-date">${escapeHtml(fullDate(when))}</span>`);
   if (subParts.length) parts.push(`<div class="lb-sub">${subParts.join(' <span class="dot">·</span> ')}</div>`);
   if (p.tags && p.tags.length) {
-    parts.push(`<div class="lb-tags">${p.tags.map((t) => `<span class="lb-tag">${escapeHtml(t)}</span>`).join('')}</div>`);
+    parts.push(`<div class="lb-tags">${p.tags.map((t) =>
+      `<button type="button" class="lb-tag" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`
+    ).join('')}</div>`);
   }
   lightboxInfo.innerHTML = parts.join('');
-  lightboxCounter.textContent = `${index + 1} / ${photos.length}`;
+  lightboxCounter.textContent = `${index + 1} / ${visiblePhotos.length}`;
 
   lightbox.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
+  requestFs(lightbox);
 }
 
 function closeLightbox() {
+  exitFs();
   lightbox.classList.add('hidden');
   lightboxMediaWrap.innerHTML = '';
   document.body.style.overflow = '';
+  currentIndex = -1;
 }
 
 function navLightbox(delta) {
   if (currentIndex < 0) return;
-  const next = (currentIndex + delta + photos.length) % photos.length;
+  const next = (currentIndex + delta + visiblePhotos.length) % visiblePhotos.length;
   openLightbox(next);
 }
 
+// ---------- Event wiring ----------
 sectionsEl.addEventListener('click', (e) => {
   const btn = e.target.closest('.tile');
   if (!btn) return;
   const i = Number(btn.dataset.index);
   if (!Number.isNaN(i)) openLightbox(i);
+});
+
+tagFiltersEl.addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  const t = chip.dataset.tag;
+  activeTag = t === '' ? null : t;
+  renderGallery();
+  // Scroll back to top of gallery so the user sees the filtered view
+  sectionsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+lightboxInfo.addEventListener('click', (e) => {
+  const tagBtn = e.target.closest('.lb-tag');
+  if (!tagBtn) return;
+  activeTag = tagBtn.dataset.tag;
+  closeLightbox();
+  renderGallery();
+  setTimeout(() => sectionsEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
 });
 
 lightboxClose.addEventListener('click', closeLightbox);
@@ -202,6 +279,19 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowLeft') navLightbox(-1);
   if (e.key === 'ArrowRight') navLightbox(1);
 });
+
+// Sync lightbox open state with fullscreen — if user exits fullscreen, close the lightbox.
+function onFsChange() {
+  const fs = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+  if (!fs && !lightbox.classList.contains('hidden')) {
+    lightbox.classList.add('hidden');
+    lightboxMediaWrap.innerHTML = '';
+    document.body.style.overflow = '';
+    currentIndex = -1;
+  }
+}
+document.addEventListener('fullscreenchange', onFsChange);
+document.addEventListener('webkitfullscreenchange', onFsChange);
 
 let touchStartX = null;
 lightbox.addEventListener('touchstart', (e) => {
@@ -220,7 +310,7 @@ async function load() {
     const res = await fetch('/api/list-photos');
     if (!res.ok) throw new Error('Could not load gallery');
     const data = await res.json();
-    photos = data.photos || [];
+    allPhotos = data.photos || [];
     renderGallery();
   } catch (err) {
     statusText.textContent = 'Could not load the gallery. Please try again.';

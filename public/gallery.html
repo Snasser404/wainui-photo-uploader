@@ -21,6 +21,8 @@
       <p id="status-text">Loading&hellip;</p>
     </section>
 
+    <nav id="tag-filters" class="tag-filters hidden" aria-label="Filter by tag"></nav>
+
     <section id="gallery-sections" class="gallery-sections hidden" aria-label="Photo gallery"></section>
 
     <nav class="bottom-nav">
@@ -29,7 +31,14 @@
   </main>
 
   <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="Photo full size">
-    <button id="lightbox-close" class="lightbox-close" aria-label="Close">&times;</button>
+    <button id="lightbox-close" class="lightbox-close lightbox-action" aria-label="Close">&times;</button>
+    <a id="lightbox-download" class="lightbox-download lightbox-action" aria-label="Download" title="Download" download target="_blank" rel="noopener">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+    </a>
     <button id="lightbox-prev" class="lightbox-nav lightbox-prev" aria-label="Previous">&#8249;</button>
     <button id="lightbox-next" class="lightbox-nav lightbox-next" aria-label="Next">&#8250;</button>
     <div id="lightbox-counter" class="lightbox-counter"></div>
