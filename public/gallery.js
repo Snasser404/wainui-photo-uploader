@@ -126,14 +126,16 @@ function renderGallery() {
         ${items.map((p) => {
           const idx = runningIndex++;
           const thumb = p.thumbnail || p.download || '';
+          const hd = p.thumbnailHd || thumb;
           const isVideo = p.type === 'video';
           const hasOverlay = p.caption || p.uploader;
           const when = p.takenAt || p.uploadedAt;
+          const srcset = hd && hd !== thumb ? `srcset="${escapeHtml(thumb)} 1x, ${escapeHtml(hd)} 2x"` : '';
           return `
             <button type="button" class="tile" data-index="${idx}" aria-label="${escapeHtml(p.caption || p.name)}">
               <div class="tile-img-wrap">
                 ${thumb
-                  ? `<img class="tile-img" loading="lazy" src="${escapeHtml(thumb)}" alt="${escapeHtml(p.caption || p.name)}" />`
+                  ? `<img class="tile-img" loading="lazy" decoding="async" src="${escapeHtml(thumb)}" ${srcset} alt="${escapeHtml(p.caption || p.name)}" />`
                   : `<div class="tile-placeholder">${isVideo ? '&#9658;' : '&#128247;'}</div>`}
                 ${isVideo ? '<span class="tile-play" aria-hidden="true">&#9658;</span>' : ''}
                 ${hasOverlay ? `
@@ -325,3 +327,15 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
+
+// When embedded with ?uploadUrl=... the in-app "Send Photos" link navigates the
+// PARENT window so the WordPress URL matches the page being shown.
+(function rewriteNavLinks() {
+  const params = new URLSearchParams(window.location.search);
+  const uploadUrl = params.get('uploadUrl');
+  if (!uploadUrl) return;
+  document.querySelectorAll('a[data-nav="upload"]').forEach((a) => {
+    a.href = uploadUrl;
+    a.setAttribute('target', '_top');
+  });
+})();

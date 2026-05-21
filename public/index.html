@@ -51,10 +51,10 @@
         <input id="caption-input" type="text" placeholder="e.g. Summer at the lake" maxlength="200" />
       </label>
 
-      <label class="name-row">
-        <span class="label-text">Tags (optional, separated by commas)</span>
-        <input id="tags-input" type="text" placeholder="e.g. family, vacation, summer" />
-      </label>
+      <div id="tags-row" class="name-row hidden">
+        <span class="label-text">Tags (optional, pick any that apply)</span>
+        <div id="tag-pills" class="tag-pills" role="group" aria-label="Tags"></div>
+      </div>
 
       <label for="file-input" class="big-button button-blue" id="pick-button">
         <span class="icon" aria-hidden="true">&#128247;</span>
@@ -87,7 +87,7 @@
       <button id="again-button" class="big-button button-blue">
         <span class="button-text">Send More</span>
       </button>
-      <a href="/gallery" class="link-row">View the Photo &amp; Video Gallery &rarr;</a>
+      <a href="/gallery" class="link-row" data-nav="gallery">View the Photo &amp; Video Gallery &rarr;</a>
     </section>
 
     <section id="step-error" class="card hidden">
@@ -100,7 +100,7 @@
     </section>
 
     <nav class="bottom-nav">
-      <a href="/gallery" class="link-row">View the Photo &amp; Video Gallery &rarr;</a>
+      <a href="/gallery" class="link-row" data-nav="gallery">View the Photo &amp; Video Gallery &rarr;</a>
     </nav>
   </main>
 

@@ -30,7 +30,9 @@ html, body {
   padding: 24px 20px 80px;
 }
 
-.container-wide { max-width: 1200px; }
+/* Wide container — lets the gallery fill the iframe / page width.
+   Inner masonry breakpoints handle column counts on big screens. */
+.container-wide { max-width: none; padding-left: 20px; padding-right: 20px; }
 
 .link-row {
   display: inline-block;
@@ -119,6 +121,8 @@ html, body {
   column-count: 4;
   column-gap: 14px;
 }
+@media (min-width: 1700px) { .masonry { column-count: 5; } }
+@media (min-width: 2100px) { .masonry { column-count: 6; } }
 @media (max-width: 1100px) { .masonry { column-count: 3; } }
 @media (max-width: 760px)  { .masonry { column-count: 2; column-gap: 10px; } }
 @media (max-width: 420px)  { .masonry { column-count: 1; } }
@@ -620,6 +624,35 @@ video.lightbox-media { background: #000; }
   color: var(--muted);
   margin: 0 0 24px;
 }
+
+/* Upload-page tag pills — checkbox-styled labels. */
+.tag-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border: 2px solid var(--border);
+  background: #ffffff;
+  border-radius: 999px;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.tag-pill input { position: absolute; opacity: 0; pointer-events: none; }
+.tag-pill:hover { border-color: var(--blue); }
+.tag-pill:has(input:checked) {
+  background: var(--blue);
+  border-color: var(--blue-dark);
+  color: #ffffff;
+}
+.tag-pill:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
 
 .install-banner {
   margin-top: 16px;

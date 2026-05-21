@@ -71,6 +71,14 @@ const server = http.createServer(async (req, res) => {
   const pathname = url.pathname;
 
   try {
+    if (pathname === '/api/config' && req.method === 'GET') {
+      const DEFAULT_TAGS = ['Family', 'Events', 'Nature', 'Food', 'Travel', 'People', 'Celebrations', 'Outdoor'];
+      const raw = process.env.ALLOWED_TAGS || '';
+      const tags = raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : DEFAULT_TAGS;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ tags }));
+    }
+
     if (pathname === '/api/upload-session' && req.method === 'POST') {
       const body = JSON.parse((await readBody(req)) || '{}');
       if (!body.filename) {
@@ -132,10 +140,14 @@ const server = http.createServer(async (req, res) => {
           try { meta = { ...meta, ...JSON.parse(decodeHtml(item.description)) }; } catch {}
         }
         const t = (item.thumbnails && item.thumbnails[0]) || {};
+        const med = (t.medium && t.medium.url) || null;
+        const lg = (t.large && t.large.url) || null;
+        const sm = (t.small && t.small.url) || null;
         return {
           id: item.id, name: item.name, size: item.size, mime,
           type: isVideo ? 'video' : 'image',
-          thumbnail: (t.large && t.large.url) || (t.medium && t.medium.url) || null,
+          thumbnail: med || lg || sm,
+          thumbnailHd: lg || med,
           download: item['@microsoft.graph.downloadUrl'] || null,
           caption: meta.caption || '',
           tags: Array.isArray(meta.tags) ? meta.tags : [],

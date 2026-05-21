@@ -32,10 +32,14 @@ function parseDescription(desc) {
   }
 }
 
-function pickThumbnail(thumbs) {
-  if (!thumbs || !thumbs.length) return null;
+function pickThumbnails(thumbs) {
+  if (!thumbs || !thumbs.length) return { small: null, medium: null, large: null };
   const t = thumbs[0];
-  return (t.large && t.large.url) || (t.medium && t.medium.url) || (t.small && t.small.url) || null;
+  return {
+    small: (t.small && t.small.url) || null,
+    medium: (t.medium && t.medium.url) || null,
+    large: (t.large && t.large.url) || null,
+  };
 }
 
 function pickTakenAt(item, fallback) {
@@ -57,6 +61,7 @@ function buildEntry(item, folderUploader) {
 
   const meta = parseDescription(item.description);
   const takenAt = pickTakenAt(item, meta.uploadedAt);
+  const thumbs = pickThumbnails(item.thumbnails);
 
   return {
     id: item.id,
@@ -64,7 +69,9 @@ function buildEntry(item, folderUploader) {
     size: item.size,
     mime,
     type: isVideo ? 'video' : 'image',
-    thumbnail: pickThumbnail(item.thumbnails),
+    // medium thumb is the gallery default (~10–30 KB); large is used for retina (srcset) and lightbox preview.
+    thumbnail: thumbs.medium || thumbs.large || thumbs.small,
+    thumbnailHd: thumbs.large || thumbs.medium,
     download: item['@microsoft.graph.downloadUrl'] || null,
     caption: meta.caption,
     tags: meta.tags,

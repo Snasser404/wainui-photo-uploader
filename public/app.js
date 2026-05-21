@@ -4,7 +4,8 @@ const fileList = document.getElementById('file-list');
 const uploadButton = document.getElementById('upload-button');
 const nameInput = document.getElementById('uploader-name');
 const captionInput = document.getElementById('caption-input');
-const tagsInput = document.getElementById('tags-input');
+const tagsRow = document.getElementById('tags-row');
+const tagPillsEl = document.getElementById('tag-pills');
 
 const stepPick = document.getElementById('step-pick');
 const stepUploading = document.getElementById('step-uploading');
@@ -133,10 +134,7 @@ uploadButton.addEventListener('click', async () => {
 
   const uploaderName = nameInput.value.trim();
   const caption = (captionInput?.value || '').trim();
-  const tags = (tagsInput?.value || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const tags = [...tagPillsEl.querySelectorAll('input[type="checkbox"]:checked')].map((cb) => cb.value);
   const totalBytes = chosenFiles.reduce((s, f) => s + f.size, 0);
   let bytesDoneBefore = 0;
   let succeeded = 0;
@@ -247,3 +245,36 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
+
+// ---------- Iframe-aware navigation ----------
+// When embedded with ?galleryUrl=... the in-app "View Gallery" links
+// navigate the PARENT window instead of the iframe, so the URL bar matches.
+(function rewriteNavLinks() {
+  const params = new URLSearchParams(window.location.search);
+  const galleryUrl = params.get('galleryUrl');
+  if (!galleryUrl) return;
+  document.querySelectorAll('a[data-nav="gallery"]').forEach((a) => {
+    a.href = galleryUrl;
+    a.setAttribute('target', '_top');
+  });
+})();
+
+// ---------- Tag pills (admin-controlled list) ----------
+async function loadTagPills() {
+  try {
+    const res = await fetch('/api/config');
+    if (!res.ok) return;
+    const { tags } = await res.json();
+    if (!Array.isArray(tags) || tags.length === 0) return;
+    tagPillsEl.innerHTML = tags.map((t, i) => `
+      <label class="tag-pill">
+        <input type="checkbox" value="${t.replace(/"/g, '&quot;')}" />
+        <span>${t.replace(/</g, '&lt;')}</span>
+      </label>
+    `).join('');
+    tagsRow.classList.remove('hidden');
+  } catch (e) {
+    console.warn('Could not load tag config', e);
+  }
+}
+loadTagPills();
