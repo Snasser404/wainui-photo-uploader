@@ -17,6 +17,7 @@ let allPhotos = [];
 let visiblePhotos = [];
 let currentIndex = -1;
 let activeTag = null;
+let controlledTags = [];
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({
@@ -66,15 +67,21 @@ function renderTagFilters() {
   for (const p of allPhotos) {
     for (const t of p.tags || []) counts.set(t, (counts.get(t) || 0) + 1);
   }
-  if (counts.size === 0) {
+  // Only the admin-controlled tags appear as filter chips, and only when at least
+  // one photo carries that tag. Older photos with free-form tags still show under
+  // "All" but don't clutter the chip bar.
+  const shown = controlledTags
+    .map((tag) => [tag, counts.get(tag) || 0])
+    .filter((entry) => entry[1] > 0);
+
+  if (shown.length === 0) {
     tagFiltersEl.classList.add('hidden');
     return;
   }
   tagFiltersEl.classList.remove('hidden');
-  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   const html = [
     `<button type="button" class="chip ${activeTag === null ? 'chip-active' : ''}" data-tag="">All <span class="chip-count">${allPhotos.length}</span></button>`,
-    ...sorted.map(([tag, count]) =>
+    ...shown.map(([tag, count]) =>
       `<button type="button" class="chip ${activeTag === tag ? 'chip-active' : ''}" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)} <span class="chip-count">${count}</span></button>`
     ),
   ];
@@ -309,9 +316,16 @@ lightbox.addEventListener('touchend', (e) => {
 
 async function load() {
   try {
-    const res = await fetch('/api/list-photos');
-    if (!res.ok) throw new Error('Could not load gallery');
-    const data = await res.json();
+    const [cfgRes, photosRes] = await Promise.all([
+      fetch('/api/config').catch(() => null),
+      fetch('/api/list-photos'),
+    ]);
+    if (cfgRes && cfgRes.ok) {
+      const cfg = await cfgRes.json();
+      if (Array.isArray(cfg.tags)) controlledTags = cfg.tags;
+    }
+    if (!photosRes.ok) throw new Error('Could not load gallery');
+    const data = await photosRes.json();
     allPhotos = data.photos || [];
     renderGallery();
   } catch (err) {
