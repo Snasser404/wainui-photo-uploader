@@ -125,17 +125,17 @@ function renderGallery() {
       <div class="masonry">
         ${items.map((p) => {
           const idx = runningIndex++;
+          // Use the lightweight medium thumbnail for the grid (~10-25 KB).
+          // The full file only loads when a tile is clicked (lightbox).
           const thumb = p.thumbnail || p.download || '';
-          const hd = p.thumbnailHd || thumb;
           const isVideo = p.type === 'video';
           const hasOverlay = p.caption || p.uploader;
           const when = p.takenAt || p.uploadedAt;
-          const srcset = hd && hd !== thumb ? `srcset="${escapeHtml(thumb)} 1x, ${escapeHtml(hd)} 2x"` : '';
           return `
             <button type="button" class="tile" data-index="${idx}" aria-label="${escapeHtml(p.caption || p.name)}">
               <div class="tile-img-wrap">
                 ${thumb
-                  ? `<img class="tile-img" loading="lazy" decoding="async" src="${escapeHtml(thumb)}" ${srcset} alt="${escapeHtml(p.caption || p.name)}" />`
+                  ? `<img class="tile-img" loading="lazy" decoding="async" src="${escapeHtml(thumb)}" alt="${escapeHtml(p.caption || p.name)}" />`
                   : `<div class="tile-placeholder">${isVideo ? '&#9658;' : '&#128247;'}</div>`}
                 ${isVideo ? '<span class="tile-play" aria-hidden="true">&#9658;</span>' : ''}
                 ${hasOverlay ? `
