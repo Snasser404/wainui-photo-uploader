@@ -246,6 +246,24 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// ---------- Auto-resize: report content height to the parent (WordPress) page ----------
+// Lets the embedding iframe grow to fit content so there's no scrolling inside the frame.
+(function setupAutoResize() {
+  function postHeight() {
+    const h = Math.ceil(document.documentElement.scrollHeight);
+    try { window.parent.postMessage({ type: 'wainui-height', height: h }, '*'); } catch (e) {}
+  }
+  window.addEventListener('load', postHeight);
+  window.addEventListener('resize', postHeight);
+  if (window.ResizeObserver) {
+    new ResizeObserver(postHeight).observe(document.body);
+  } else {
+    setInterval(postHeight, 1000);
+  }
+  setTimeout(postHeight, 300);
+  setTimeout(postHeight, 1200);
+})();
+
 // ---------- Iframe-aware navigation ----------
 // When embedded with ?galleryUrl=... the in-app "View Gallery" links
 // navigate the PARENT window instead of the iframe, so the URL bar matches.

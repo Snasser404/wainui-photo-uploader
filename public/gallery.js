@@ -353,3 +353,24 @@ if ('serviceWorker' in navigator) {
     a.setAttribute('target', '_top');
   });
 })();
+
+// ---------- Auto-resize: report content height to the parent (WordPress) page ----------
+// Grows the embedding iframe to fit the gallery so there's no scrolling inside the frame.
+// Re-fires whenever content changes (images load, filters applied, sections expand/collapse).
+(function setupAutoResize() {
+  function postHeight() {
+    // While the fullscreen lightbox is open the browser owns the screen; skip resizing.
+    if (!lightbox.classList.contains('hidden')) return;
+    const h = Math.ceil(document.documentElement.scrollHeight);
+    try { window.parent.postMessage({ type: 'wainui-height', height: h }, '*'); } catch (e) {}
+  }
+  window.addEventListener('load', postHeight);
+  window.addEventListener('resize', postHeight);
+  if (window.ResizeObserver) {
+    new ResizeObserver(postHeight).observe(document.body);
+  } else {
+    setInterval(postHeight, 1000);
+  }
+  setTimeout(postHeight, 300);
+  setTimeout(postHeight, 1200);
+})();

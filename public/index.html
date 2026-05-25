@@ -16,8 +16,6 @@
 <body>
   <main class="container">
     <header class="header">
-      <h1>Send Your Photos &amp; Videos</h1>
-      <p class="subtitle">Choose your photos or videos below, then press the big green button.</p>
       <div id="install-banner" class="install-banner hidden">
         <button id="install-button" class="install-button" type="button">
           <span aria-hidden="true">&#128241;</span>
@@ -48,7 +46,7 @@
 
       <label class="name-row">
         <span class="label-text">Caption (optional)</span>
-        <input id="caption-input" type="text" placeholder="e.g. Summer at the lake" maxlength="200" />
+        <input id="caption-input" type="text" placeholder="e.g. perfect day on the lake" maxlength="200" />
       </label>
 
       <div id="tags-row" class="name-row hidden">
@@ -58,11 +56,9 @@
 
       <label for="file-input" class="big-button button-blue" id="pick-button">
         <span class="icon" aria-hidden="true">&#128247;</span>
-        <span class="button-text">Choose Photos or Videos</span>
+        <span class="button-text">select photos and/or videos</span>
       </label>
       <input id="file-input" type="file" accept="image/*,video/*" multiple hidden />
-
-      <p class="hint">You can pick more than one at a time. Photos and videos both work.</p>
 
       <ul id="file-list" class="file-list" aria-live="polite"></ul>
 

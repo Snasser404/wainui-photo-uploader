@@ -72,7 +72,7 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (pathname === '/api/config' && req.method === 'GET') {
-      const DEFAULT_TAGS = ['Family', 'Events', 'Nature', 'Food', 'Travel', 'People', 'Celebrations', 'Outdoor'];
+      const DEFAULT_TAGS = ['coaching', 'people', 'nature', 'Kupuna', 'Junior', 'camps', 'events', 'OC1 / OC2', 'OC6', 'V12', 'surfski', 'SUP', 'huli', 'racing', 'WNWN?', "KOA's CUP"];
       const raw = process.env.ALLOWED_TAGS || '';
       const tags = raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : DEFAULT_TAGS;
       res.writeHead(200, { 'Content-Type': 'application/json' });
