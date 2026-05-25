@@ -2,7 +2,7 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createUploadSession, getAuthUrl, exchangeCodeForToken, getAccessToken } from './lib/graph.js';
+import { createUploadSession, getAuthUrl, exchangeCodeForToken, getAccessToken, readSettingsFile, writeSettingsFile } from './lib/graph.js';
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -32,6 +32,7 @@ function serveStatic(req, res) {
   let urlPath = decodeURIComponent(req.url.split('?')[0]);
   if (urlPath === '/') urlPath = '/index.html';
   if (urlPath === '/gallery') urlPath = '/gallery.html';
+  if (urlPath === '/admin') urlPath = '/admin.html';
   const filePath = path.join(PUBLIC_DIR, urlPath);
   if (!filePath.startsWith(PUBLIC_DIR)) return notFound(res);
   fs.stat(filePath, (err, stat) => {
@@ -73,10 +74,40 @@ const server = http.createServer(async (req, res) => {
   try {
     if (pathname === '/api/config' && req.method === 'GET') {
       const DEFAULT_TAGS = ['coaching', 'people', 'nature', 'Kupuna', 'Junior', 'camps', 'events', 'OC1 / OC2', 'OC6', 'V12', 'surfski', 'SUP', 'huli', 'racing', 'WNWN?', "KOA's CUP"];
-      const raw = process.env.ALLOWED_TAGS || '';
-      const tags = raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : DEFAULT_TAGS;
+      let tags = null;
+      try {
+        const settings = await readSettingsFile();
+        if (settings && Array.isArray(settings.tags) && settings.tags.length) tags = settings.tags;
+      } catch (e) { /* fall through to defaults */ }
+      if (!tags) {
+        const raw = process.env.ALLOWED_TAGS || '';
+        tags = raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : DEFAULT_TAGS;
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ tags }));
+    }
+
+    if (pathname === '/api/save-config' && req.method === 'POST') {
+      const expected = process.env.ADMIN_PASSWORD;
+      if (!expected) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'Admin password is not configured. Set ADMIN_PASSWORD.' }));
+      }
+      const body = JSON.parse((await readBody(req)) || '{}');
+      if (!body.password || body.password !== expected) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'Wrong password.' }));
+      }
+      const tags = Array.isArray(body.tags)
+        ? body.tags.map((t) => String(t).trim()).filter(Boolean).slice(0, 100)
+        : [];
+      if (tags.length === 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'Please keep at least one tag.' }));
+      }
+      await writeSettingsFile({ tags, updatedAt: new Date().toISOString() });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: true, tags }));
     }
 
     if (pathname === '/api/upload-session' && req.method === 'POST') {

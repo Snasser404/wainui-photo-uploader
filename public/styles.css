@@ -655,6 +655,24 @@ video.lightbox-media { background: #000; }
 }
 .tag-pill:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
 
+/* Admin settings page */
+.settings-textarea {
+  width: 100%;
+  min-height: 320px;
+  font-size: 18px;
+  line-height: 1.6;
+  padding: 14px 16px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  resize: vertical;
+  color: var(--text);
+}
+.settings-textarea:focus { outline: 4px solid var(--focus); outline-offset: 2px; border-color: var(--blue); }
+.settings-status { font-size: 18px; margin: 16px 0 0; text-align: center; min-height: 24px; }
+.settings-status-ok { color: var(--green); font-weight: 600; }
+.settings-status-error { color: var(--red); font-weight: 600; }
+
 .install-banner {
   margin-top: 16px;
 }

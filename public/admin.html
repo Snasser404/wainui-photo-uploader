@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gallery Settings</title>
+  <link rel="stylesheet" href="styles.css" />
+  <meta name="robots" content="noindex, nofollow" />
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>Gallery Settings</h1>
+      <p class="subtitle">Manage the tags members can choose when uploading.</p>
+    </header>
+
+    <section class="card">
+      <h2 style="margin-top:0;font-size:24px;">Tags</h2>
+      <p class="hint" style="text-align:left;margin-top:0;">
+        One tag per line. The order here is the order shown to members. Capital letters are kept exactly as typed.
+      </p>
+      <textarea id="tags-area" class="settings-textarea" spellcheck="false" aria-label="Tag list, one per line"></textarea>
+
+      <label class="name-row" style="margin-top:20px;">
+        <span class="label-text">Admin password</span>
+        <input id="admin-password" type="password" placeholder="Enter the admin password" autocomplete="current-password" />
+      </label>
+
+      <button id="save-button" class="big-button button-green" style="margin-top:8px;">
+        <span class="button-text">Save Tags</span>
+      </button>
+
+      <p id="status-msg" class="settings-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <nav class="bottom-nav">
+      <a href="/" class="link-row">&larr; Back to Upload</a>
+    </nav>
+  </main>
+
+  <script src="admin.js"></script>
+</body>
+</html>
