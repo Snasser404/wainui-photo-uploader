@@ -107,6 +107,62 @@ html, body {
 .date-section { margin-top: 36px; }
 .date-section:first-child { margin-top: 8px; }
 
+/* Per-day sub-heading inside a section or expanded month */
+.date-subheading {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 18px 0 10px;
+}
+.date-subheading:first-child { margin-top: 6px; }
+
+/* Collapsible month / year accordions (native <details>) */
+.collapse-group {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
+}
+.collapse-summary {
+  cursor: pointer;
+  padding: 16px 18px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  background: #f1f4f8;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  list-style: none;
+  user-select: none;
+}
+.collapse-summary::-webkit-details-marker { display: none; }
+.collapse-summary::before {
+  content: '\25B8'; /* ▸ */
+  color: var(--blue);
+  font-size: 16px;
+  transition: transform 0.15s ease;
+}
+details[open] > .collapse-summary::before { transform: rotate(90deg); }
+.collapse-summary:hover { background: #e7edf4; }
+.collapse-summary:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
+.collapse-count {
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  background: #ffffff;
+  padding: 3px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+.collapse-body { padding: 4px 16px 16px; }
+
+.collapse-year > .collapse-summary-year { font-size: 24px; background: #e3effb; }
+.collapse-nested { margin: 10px 0; border-color: #e2e8f0; }
+.collapse-nested > .collapse-summary { font-size: 18px; background: #f6f8fb; }
+
 .date-section-heading {
   font-size: 22px;
   font-weight: 700;

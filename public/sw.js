@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wainui-v13';
+const CACHE_NAME = 'wainui-v14';
 const ASSETS = [
   '/',
   '/index.html',

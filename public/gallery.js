@@ -27,17 +27,89 @@ function escapeHtml(s) {
 
 function startOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); }
 
-function groupLabel(iso) {
-  if (!iso) return 'Earlier';
-  const date = new Date(iso);
-  const today = startOfDay(new Date());
-  const that = startOfDay(date);
-  const diff = (today - that) / (1000 * 60 * 60 * 24);
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Yesterday';
-  if (diff < 7) return 'Earlier this week';
-  if (diff < 30) return 'Earlier this month';
-  return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+const DAY_MS = 86400000;
+
+// Sort photos into recent (expanded) buckets and older (collapsible) buckets.
+function bucketPhotos(photos, now) {
+  const todayStart = startOfDay(now);
+  const nowYear = now.getFullYear();
+  const nowMonth = now.getMonth();
+  const b = {
+    today: [], yesterday: [], thisWeek: [], thisMonth: [],
+    pastMonths: new Map(),   // monthIdx -> [photos]  (current year)
+    pastYears: new Map(),    // year -> Map(monthIdx -> [photos])
+  };
+  for (const p of photos) {
+    const dt = new Date(p.takenAt || p.uploadedAt);
+    if (isNaN(dt.getTime())) { b.thisMonth.push(p); continue; }
+    const diffDays = Math.floor((todayStart - startOfDay(dt)) / DAY_MS);
+    if (diffDays <= 0) { b.today.push(p); continue; }
+    if (diffDays === 1) { b.yesterday.push(p); continue; }
+    if (diffDays < 7) { b.thisWeek.push(p); continue; }
+    const y = dt.getFullYear(), m = dt.getMonth();
+    if (y === nowYear && m === nowMonth) { b.thisMonth.push(p); continue; }
+    if (y === nowYear) {
+      if (!b.pastMonths.has(m)) b.pastMonths.set(m, []);
+      b.pastMonths.get(m).push(p);
+      continue;
+    }
+    if (!b.pastYears.has(y)) b.pastYears.set(y, new Map());
+    const ym = b.pastYears.get(y);
+    if (!ym.has(m)) ym.set(m, []);
+    ym.get(m).push(p);
+  }
+  return b;
+}
+
+// Group a list of photos by exact calendar day (keeps incoming desc order).
+function groupByExactDate(photos) {
+  const map = new Map();
+  for (const p of photos) {
+    const dt = new Date(p.takenAt || p.uploadedAt);
+    const key = isNaN(dt.getTime()) ? 'unknown' : startOfDay(dt);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(p);
+  }
+  return map;
+}
+
+function dateHeading(key) {
+  if (key === 'unknown') return 'Date unknown';
+  return new Date(Number(key)).toLocaleDateString(undefined, {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+}
+
+function renderTile(p, idx) {
+  const thumb = p.thumbnail || p.download || '';
+  const isVideo = p.type === 'video';
+  const hasOverlay = p.caption || p.uploader;
+  const when = p.takenAt || p.uploadedAt;
+  return `
+    <button type="button" class="tile" data-index="${idx}" aria-label="${escapeHtml(p.caption || p.name)}">
+      <div class="tile-img-wrap">
+        ${thumb
+          ? `<img class="tile-img" loading="lazy" decoding="async" src="${escapeHtml(thumb)}" alt="${escapeHtml(p.caption || p.name)}" />`
+          : `<div class="tile-placeholder">${isVideo ? '&#9658;' : '&#128247;'}</div>`}
+        ${isVideo ? '<span class="tile-play" aria-hidden="true">&#9658;</span>' : ''}
+        ${hasOverlay ? `
+          <div class="tile-overlay">
+            ${p.caption ? `<div class="tile-caption">${escapeHtml(p.caption)}</div>` : ''}
+            <div class="tile-meta">
+              ${p.uploader ? `<span class="tile-uploader">${escapeHtml(p.uploader)}</span>` : ''}
+              <span class="tile-date">${escapeHtml(shortDate(when))}</span>
+            </div>
+          </div>
+        ` : `
+          <div class="tile-overlay tile-overlay-bare">
+            <span class="tile-date">${escapeHtml(shortDate(when))}</span>
+          </div>
+        `}
+      </div>
+    </button>
+  `;
 }
 
 function shortDate(iso) {
@@ -115,57 +187,54 @@ function renderGallery() {
     return;
   }
 
-  const groups = new Map();
-  for (const p of visiblePhotos) {
-    const key = groupLabel(p.takenAt || p.uploadedAt);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(p);
+  // visiblePhotos is already sorted newest-first. Index counter keeps tile
+  // data-index aligned with the flat visiblePhotos array for the lightbox.
+  let runningIndex = 0;
+
+  // Renders day-grouped masonry for a set of photos, advancing the flat index.
+  function renderDateGroups(photos) {
+    const byDate = groupByExactDate(photos);
+    let out = '';
+    for (const [key, items] of byDate) {
+      out += `<h3 class="date-subheading">${escapeHtml(dateHeading(key))}</h3>`;
+      out += `<div class="masonry">${items.map((p) => renderTile(p, runningIndex++)).join('')}</div>`;
+    }
+    return out;
   }
 
-  let runningIndex = 0;
-  sectionsEl.innerHTML = '';
-  for (const [label, items] of groups) {
-    const section = document.createElement('section');
-    section.className = 'date-section';
-    section.innerHTML = `
-      <h2 class="date-section-heading">${escapeHtml(label)}</h2>
-      <div class="masonry">
-        ${items.map((p) => {
-          const idx = runningIndex++;
-          // Use the lightweight medium thumbnail for the grid (~10-25 KB).
-          // The full file only loads when a tile is clicked (lightbox).
-          const thumb = p.thumbnail || p.download || '';
-          const isVideo = p.type === 'video';
-          const hasOverlay = p.caption || p.uploader;
-          const when = p.takenAt || p.uploadedAt;
-          return `
-            <button type="button" class="tile" data-index="${idx}" aria-label="${escapeHtml(p.caption || p.name)}">
-              <div class="tile-img-wrap">
-                ${thumb
-                  ? `<img class="tile-img" loading="lazy" decoding="async" src="${escapeHtml(thumb)}" alt="${escapeHtml(p.caption || p.name)}" />`
-                  : `<div class="tile-placeholder">${isVideo ? '&#9658;' : '&#128247;'}</div>`}
-                ${isVideo ? '<span class="tile-play" aria-hidden="true">&#9658;</span>' : ''}
-                ${hasOverlay ? `
-                  <div class="tile-overlay">
-                    ${p.caption ? `<div class="tile-caption">${escapeHtml(p.caption)}</div>` : ''}
-                    <div class="tile-meta">
-                      ${p.uploader ? `<span class="tile-uploader">${escapeHtml(p.uploader)}</span>` : ''}
-                      <span class="tile-date">${escapeHtml(shortDate(when))}</span>
-                    </div>
-                  </div>
-                ` : `
-                  <div class="tile-overlay tile-overlay-bare">
-                    <span class="tile-date">${escapeHtml(shortDate(when))}</span>
-                  </div>
-                `}
-              </div>
-            </button>
-          `;
-        }).join('')}
-      </div>
-    `;
-    sectionsEl.appendChild(section);
+  function expandedSection(label, photos) {
+    return `<section class="date-section"><h2 class="date-section-heading">${escapeHtml(label)}</h2>${renderDateGroups(photos)}</section>`;
   }
+
+  function collapsible(label, photos, extraClass) {
+    return `<details class="collapse-group ${extraClass || ''}"><summary class="collapse-summary">${escapeHtml(label)}<span class="collapse-count">${photos.length}</span></summary><div class="collapse-body">${renderDateGroups(photos)}</div></details>`;
+  }
+
+  const now = new Date();
+  const b = bucketPhotos(visiblePhotos, now);
+  let html = '';
+
+  if (b.today.length) html += expandedSection('Today', b.today);
+  if (b.yesterday.length) html += expandedSection('Yesterday', b.yesterday);
+  if (b.thisWeek.length) html += expandedSection('Earlier this week', b.thisWeek);
+  if (b.thisMonth.length) html += collapsible('Earlier this month', b.thisMonth);
+
+  // Past months of the current year (newest first), each its own button.
+  for (const [monthIdx, photos] of b.pastMonths) {
+    html += collapsible(MONTH_NAMES[monthIdx], photos);
+  }
+
+  // Past years: a year button that opens to reveal month buttons inside.
+  for (const [year, monthsMap] of b.pastYears) {
+    let inner = '';
+    for (const [monthIdx, photos] of monthsMap) {
+      inner += collapsible(MONTH_NAMES[monthIdx], photos, 'collapse-nested');
+    }
+    const yearTotal = [...monthsMap.values()].reduce((s, a) => s + a.length, 0);
+    html += `<details class="collapse-group collapse-year"><summary class="collapse-summary collapse-summary-year">${year}<span class="collapse-count">${yearTotal}</span></summary><div class="collapse-body">${inner}</div></details>`;
+  }
+
+  sectionsEl.innerHTML = html;
 }
 
 // ---------- Fullscreen helpers ----------
