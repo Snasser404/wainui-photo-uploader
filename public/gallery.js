@@ -83,7 +83,9 @@ function dateHeading(key) {
 }
 
 function renderTile(p, idx) {
-  const thumb = p.thumbnail || p.download || '';
+  // Use the sharp 800px thumbnail so tiles stay crisp on retina/phone screens.
+  // Affordable now that the date-collapsing only loads recent photos up front.
+  const thumb = p.thumbnailHd || p.thumbnail || p.download || '';
   const isVideo = p.type === 'video';
   const hasOverlay = p.caption || p.uploader;
   const when = p.takenAt || p.uploadedAt;
