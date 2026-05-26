@@ -94,10 +94,13 @@ function putChunk(uploadUrl, blob, start, end, total, onProgress) {
   });
 }
 
-async function uploadOneFile(file, uploaderName, onProgress) {
-  const takenAt = file.lastModified
+function fileTakenAt(file) {
+  return file.lastModified
     ? new Date(file.lastModified).toISOString()
     : new Date().toISOString();
+}
+
+async function uploadOneFile(file, takenAt, onProgress) {
   const uploadUrl = await getUploadUrl(file.name, takenAt);
   const total = file.size;
   let offset = 0;
@@ -112,14 +115,16 @@ async function uploadOneFile(file, uploaderName, onProgress) {
   return lastBody;
 }
 
-async function saveMetadata(itemId, caption, tags, uploader) {
+// Always called after upload so the file's real date (takenAt) is stored
+// immediately — this makes the gallery show the correct date right away
+// instead of briefly showing the upload date until OneDrive extracts EXIF.
+async function saveMetadata(itemId, caption, tags, uploader, takenAt) {
   if (!itemId) return;
-  if (!caption && !uploader && (!tags || tags.length === 0)) return;
   try {
     await fetch('/api/set-metadata', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemId, caption, tags, uploader }),
+      body: JSON.stringify({ itemId, caption, tags, uploader, takenAt }),
     });
   } catch (e) {
     console.warn('metadata save failed', e);
@@ -145,12 +150,13 @@ uploadButton.addEventListener('click', async () => {
     const file = chosenFiles[i];
     progressText.textContent = `Sending ${i + 1} of ${chosenFiles.length} ${noun}: ${file.name}`;
     try {
-      const item = await uploadOneFile(file, uploaderName, (uploadedInThisFile) => {
+      const takenAt = fileTakenAt(file);
+      const item = await uploadOneFile(file, takenAt, (uploadedInThisFile) => {
         const overall = bytesDoneBefore + uploadedInThisFile;
         const pct = Math.min(99, Math.round((overall / totalBytes) * 100));
         progressBar.style.width = pct + '%';
       });
-      if (item?.id) await saveMetadata(item.id, caption, tags, uploaderName);
+      if (item?.id) await saveMetadata(item.id, caption, tags, uploaderName, takenAt);
       succeeded += 1;
     } catch (err) {
       console.error(err);
@@ -204,12 +210,18 @@ function isIOS() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 }
 
+// True when the app is embedded in another page (i.e. inside the website iframe).
+// Members always use it embedded, so we never show the "install" prompt there.
+function isEmbedded() {
+  try { return window.self !== window.top; } catch (e) { return true; }
+}
+
 let deferredPrompt = null;
 
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  if (!isStandalone()) installBanner.classList.remove('hidden');
+  if (!isStandalone() && !isEmbedded()) installBanner.classList.remove('hidden');
 });
 
 installButton.addEventListener('click', async () => {
@@ -236,7 +248,7 @@ window.addEventListener('appinstalled', () => {
   deferredPrompt = null;
 });
 
-if (isIOS() && !isStandalone()) {
+if (isIOS() && !isStandalone() && !isEmbedded()) {
   installBanner.classList.remove('hidden');
 }
 

@@ -14,12 +14,17 @@ export default async function handler(req, res) {
     const { itemId, caption, tags, uploader } = body;
     if (!itemId) return res.status(400).json({ error: 'itemId required' });
 
+    const { takenAt } = body;
     const meta = {
       caption: (caption || '').slice(0, 500),
       tags: Array.isArray(tags)
         ? tags.map((t) => String(t).slice(0, 40)).slice(0, 20)
         : [],
       uploader: (uploader || '').slice(0, 60),
+      // takenAt = the file's own date, captured on the device at upload time.
+      // Stored immediately so the gallery shows the correct date without waiting
+      // for OneDrive to extract EXIF (which happens minutes later).
+      takenAt: takenAt && !Number.isNaN(Date.parse(takenAt)) ? takenAt : null,
       uploadedAt: new Date().toISOString(),
     };
 

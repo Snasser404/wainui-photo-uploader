@@ -137,6 +137,7 @@ const server = http.createServer(async (req, res) => {
         caption: (body.caption || '').slice(0, 500),
         tags: Array.isArray(body.tags) ? body.tags.slice(0, 20) : [],
         uploader: (body.uploader || '').slice(0, 60),
+        takenAt: body.takenAt && !Number.isNaN(Date.parse(body.takenAt)) ? body.takenAt : null,
         uploadedAt: new Date().toISOString(),
       };
       const token = await getAccessToken();
@@ -156,17 +157,18 @@ const server = http.createServer(async (req, res) => {
         .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
         .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
       const DATE_RE = /^\d{4}-\d{2}$/;
-      const pickTaken = (item, fallback) =>
+      const pickTaken = (item, meta) =>
+        (meta && meta.takenAt) ||
         (item.photo && item.photo.takenDateTime) ||
         (item.video && item.video.mediaCreatedDateTime) ||
-        fallback || item.createdDateTime;
+        (meta && meta.uploadedAt) || item.createdDateTime;
       const toEntry = (item, folderUploader) => {
         if (!item.file) return null;
         const mime = item.file.mimeType || '';
         const isImage = mime.startsWith('image/');
         const isVideo = mime.startsWith('video/');
         if (!isImage && !isVideo) return null;
-        let meta = { caption: '', tags: [], uploader: '', uploadedAt: null };
+        let meta = { caption: '', tags: [], uploader: '', takenAt: null, uploadedAt: null };
         if (item.description) {
           try { meta = { ...meta, ...JSON.parse(decodeHtml(item.description)) }; } catch {}
         }
@@ -183,7 +185,7 @@ const server = http.createServer(async (req, res) => {
           caption: meta.caption || '',
           tags: Array.isArray(meta.tags) ? meta.tags : [],
           uploader: meta.uploader || folderUploader || '',
-          takenAt: pickTaken(item, meta.uploadedAt),
+          takenAt: pickTaken(item, meta),
           uploadedAt: meta.uploadedAt || item.createdDateTime,
         };
       };

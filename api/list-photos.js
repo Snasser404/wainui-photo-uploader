@@ -17,7 +17,7 @@ function decodeHtml(s) {
 }
 
 function parseDescription(desc) {
-  if (!desc) return { caption: '', tags: [], uploader: '', uploadedAt: null };
+  if (!desc) return { caption: '', tags: [], uploader: '', takenAt: null, uploadedAt: null };
   const decoded = decodeHtml(desc);
   try {
     const parsed = JSON.parse(decoded);
@@ -25,10 +25,11 @@ function parseDescription(desc) {
       caption: parsed.caption || '',
       tags: Array.isArray(parsed.tags) ? parsed.tags : [],
       uploader: parsed.uploader || '',
+      takenAt: parsed.takenAt || null,
       uploadedAt: parsed.uploadedAt || null,
     };
   } catch {
-    return { caption: decoded, tags: [], uploader: '', uploadedAt: null };
+    return { caption: decoded, tags: [], uploader: '', takenAt: null, uploadedAt: null };
   }
 }
 
@@ -42,12 +43,15 @@ function pickThumbnails(thumbs) {
   };
 }
 
-function pickTakenAt(item, fallback) {
-  // Prefer the date the photo/video was actually captured, fall back to upload time.
+function pickTakenAt(item, meta) {
+  // Prefer the stored file date (captured on the device at upload — stable and
+  // available immediately, so the displayed date never "jumps"). Then fall back
+  // to OneDrive's EXIF date, then video metadata, then upload/created time.
   return (
+    (meta && meta.takenAt) ||
     (item.photo && item.photo.takenDateTime) ||
     (item.video && item.video.mediaCreatedDateTime) ||
-    fallback ||
+    (meta && meta.uploadedAt) ||
     item.createdDateTime
   );
 }
@@ -60,7 +64,7 @@ function buildEntry(item, folderUploader) {
   if (!isImage && !isVideo) return null;
 
   const meta = parseDescription(item.description);
-  const takenAt = pickTakenAt(item, meta.uploadedAt);
+  const takenAt = pickTakenAt(item, meta);
   const thumbs = pickThumbnails(item.thumbnails);
 
   return {
@@ -141,7 +145,7 @@ export default async function handler(req, res) {
     const total = allPhotos.length;
     const photos = allPhotos.slice(0, limit);
 
-    res.setHeader('Cache-Control', 'public, max-age=60');
+    res.setHeader('Cache-Control', 'public, max-age=20');
     res.status(200).json({ photos, total, returned: photos.length, limit });
   } catch (err) {
     console.error('list-photos error:', err.message);

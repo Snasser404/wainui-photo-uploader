@@ -83,17 +83,21 @@ function dateHeading(key) {
 }
 
 function renderTile(p, idx) {
-  // Use the sharp 800px thumbnail so tiles stay crisp on retina/phone screens.
-  // Affordable now that the date-collapsing only loads recent photos up front.
-  const thumb = p.thumbnailHd || p.thumbnail || p.download || '';
+  // Grid uses the small/medium preview (~10-25 KB) for fast loading.
+  // The clear 800px version loads only when a tile is opened (lightbox),
+  // and the full original only when the user taps Download.
+  const thumb = p.thumbnail || p.thumbnailHd || p.download || '';
   const isVideo = p.type === 'video';
   const hasOverlay = p.caption || p.uploader;
   const when = p.takenAt || p.uploadedAt;
+  // If a thumbnail fails (e.g. the photo was just deleted from OneDrive), hide the
+  // tile instead of showing a broken-image "?" — it disappears cleanly.
+  const onErr = "this.closest('.tile').style.display='none'";
   return `
     <button type="button" class="tile" data-index="${idx}" aria-label="${escapeHtml(p.caption || p.name)}">
       <div class="tile-img-wrap">
         ${thumb
-          ? `<img class="tile-img" loading="lazy" decoding="async" src="${escapeHtml(thumb)}" alt="${escapeHtml(p.caption || p.name)}" />`
+          ? `<img class="tile-img" loading="lazy" decoding="async" src="${escapeHtml(thumb)}" alt="${escapeHtml(p.caption || p.name)}" onerror="${onErr}" />`
           : `<div class="tile-placeholder">${isVideo ? '&#9658;' : '&#128247;'}</div>`}
         ${isVideo ? '<span class="tile-play" aria-hidden="true">&#9658;</span>' : ''}
         ${hasOverlay ? `
@@ -264,9 +268,11 @@ function openLightbox(index) {
     v.playsInline = true;
     v.className = 'lightbox-media';
     lightboxMediaWrap.appendChild(v);
-  } else if (p.download) {
+  } else if (p.thumbnailHd || p.download) {
+    // Show the screen-sized 800px version for fast, clear viewing — NOT the
+    // multi-MB original. The original is only fetched via the Download button.
     const img = document.createElement('img');
-    img.src = p.download;
+    img.src = p.thumbnailHd || p.download;
     img.alt = p.caption || p.name;
     img.className = 'lightbox-media';
     lightboxMediaWrap.appendChild(img);
