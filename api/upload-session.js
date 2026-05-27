@@ -6,7 +6,12 @@ function dateToMonthFolder(input) {
     const ms = typeof input === 'number' ? input : Date.parse(input);
     if (!Number.isNaN(ms)) d = new Date(ms);
   }
-  if (!d || Number.isNaN(d.getTime())) d = new Date();
+  // Reject implausible dates (e.g. 1601/1970 placeholders from files with no real
+  // timestamp, or future dates) so photos don't land in bogus year-month folders.
+  if (!d || Number.isNaN(d.getTime()) || d.getUTCFullYear() < 2000 ||
+      d.getTime() > Date.now() + 86400000) {
+    d = new Date();
+  }
   const y = d.getUTCFullYear();
   const m = String(d.getUTCMonth() + 1).padStart(2, '0');
   return `${y}-${m}`;

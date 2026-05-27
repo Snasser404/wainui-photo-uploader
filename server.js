@@ -117,7 +117,8 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: 'filename required' }));
       }
       const ms = body.takenAt ? Date.parse(body.takenAt) : Date.now();
-      const d = new Date(Number.isNaN(ms) ? Date.now() : ms);
+      let d = new Date(Number.isNaN(ms) ? Date.now() : ms);
+      if (d.getUTCFullYear() < 2000 || d.getTime() > Date.now() + 86400000) d = new Date();
       const subfolder = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
       const session = await createUploadSession({ filename: body.filename, subfolder });
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -137,7 +138,13 @@ const server = http.createServer(async (req, res) => {
         caption: (body.caption || '').slice(0, 500),
         tags: Array.isArray(body.tags) ? body.tags.slice(0, 20) : [],
         uploader: (body.uploader || '').slice(0, 60),
-        takenAt: body.takenAt && !Number.isNaN(Date.parse(body.takenAt)) ? body.takenAt : null,
+        takenAt: (() => {
+          if (!body.takenAt) return null;
+          const t = Date.parse(body.takenAt);
+          if (Number.isNaN(t)) return null;
+          const dd = new Date(t);
+          return (dd.getUTCFullYear() >= 2000 && dd.getTime() <= Date.now() + 86400000) ? body.takenAt : null;
+        })(),
         uploadedAt: new Date().toISOString(),
       };
       const token = await getAccessToken();

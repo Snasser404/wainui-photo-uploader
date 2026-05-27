@@ -82,7 +82,7 @@ function dateHeading(key) {
   });
 }
 
-function renderTile(p, idx) {
+function renderTile(p, idx, eager) {
   // Grid uses the small/medium preview (~10-25 KB) for fast loading.
   // The clear 800px version loads only when a tile is opened (lightbox),
   // and the full original only when the user taps Download.
@@ -93,11 +93,17 @@ function renderTile(p, idx) {
   // If a thumbnail fails (e.g. the photo was just deleted from OneDrive), hide the
   // tile instead of showing a broken-image "?" — it disappears cleanly.
   const onErr = "this.closest('.tile').style.display='none'";
+  // eager = sections shown by default (today/week): load now so the frame measures
+  // the correct height. Collapsed months use data-src and load when opened, so
+  // they don't slow the gallery and don't break the auto-resize.
+  const imgAttr = eager
+    ? `src="${escapeHtml(thumb)}"`
+    : `data-src="${escapeHtml(thumb)}"`;
   return `
     <button type="button" class="tile" data-index="${idx}" aria-label="${escapeHtml(p.caption || p.name)}">
       <div class="tile-img-wrap">
         ${thumb
-          ? `<img class="tile-img" loading="lazy" decoding="async" src="${escapeHtml(thumb)}" alt="${escapeHtml(p.caption || p.name)}" onerror="${onErr}" />`
+          ? `<img class="tile-img" decoding="async" ${imgAttr} alt="${escapeHtml(p.caption || p.name)}" onerror="${onErr}" />`
           : `<div class="tile-placeholder">${isVideo ? '&#9658;' : '&#128247;'}</div>`}
         ${isVideo ? '<span class="tile-play" aria-hidden="true">&#9658;</span>' : ''}
         ${hasOverlay ? `
@@ -198,22 +204,23 @@ function renderGallery() {
   let runningIndex = 0;
 
   // Renders day-grouped masonry for a set of photos, advancing the flat index.
-  function renderDateGroups(photos) {
+  // eager = load images immediately (used for sections visible by default).
+  function renderDateGroups(photos, eager) {
     const byDate = groupByExactDate(photos);
     let out = '';
     for (const [key, items] of byDate) {
       out += `<h3 class="date-subheading">${escapeHtml(dateHeading(key))}</h3>`;
-      out += `<div class="masonry">${items.map((p) => renderTile(p, runningIndex++)).join('')}</div>`;
+      out += `<div class="masonry">${items.map((p) => renderTile(p, runningIndex++, eager)).join('')}</div>`;
     }
     return out;
   }
 
   function expandedSection(label, photos) {
-    return `<section class="date-section"><h2 class="date-section-heading">${escapeHtml(label)}</h2>${renderDateGroups(photos)}</section>`;
+    return `<section class="date-section"><h2 class="date-section-heading">${escapeHtml(label)}</h2>${renderDateGroups(photos, true)}</section>`;
   }
 
   function collapsible(label, photos, extraClass) {
-    return `<details class="collapse-group ${extraClass || ''}"><summary class="collapse-summary">${escapeHtml(label)}<span class="collapse-count">${photos.length}</span></summary><div class="collapse-body">${renderDateGroups(photos)}</div></details>`;
+    return `<details class="collapse-group ${extraClass || ''}"><summary class="collapse-summary">${escapeHtml(label)}<span class="collapse-count">${photos.length}</span></summary><div class="collapse-body">${renderDateGroups(photos, false)}</div></details>`;
   }
 
   const now = new Date();
@@ -434,20 +441,34 @@ if ('serviceWorker' in navigator) {
 // ---------- Auto-resize: report content height to the parent (WordPress) page ----------
 // Grows the embedding iframe to fit the gallery so there's no scrolling inside the frame.
 // Re-fires whenever content changes (images load, filters applied, sections expand/collapse).
-(function setupAutoResize() {
-  function postHeight() {
-    // While the fullscreen lightbox is open the browser owns the screen; skip resizing.
-    if (!lightbox.classList.contains('hidden')) return;
-    const h = Math.ceil(document.documentElement.scrollHeight);
-    try { window.parent.postMessage({ type: 'wainui-height', height: h }, '*'); } catch (e) {}
-  }
-  window.addEventListener('load', postHeight);
-  window.addEventListener('resize', postHeight);
-  if (window.ResizeObserver) {
-    new ResizeObserver(postHeight).observe(document.body);
-  } else {
-    setInterval(postHeight, 1000);
-  }
-  setTimeout(postHeight, 300);
-  setTimeout(postHeight, 1200);
-})();
+function postHeight() {
+  // While the fullscreen lightbox is open the browser owns the screen; skip resizing.
+  if (!lightbox.classList.contains('hidden')) return;
+  const h = Math.ceil(document.documentElement.scrollHeight);
+  try { window.parent.postMessage({ type: 'wainui-height', height: h }, '*'); } catch (e) {}
+}
+
+window.addEventListener('load', postHeight);
+window.addEventListener('resize', postHeight);
+if (window.ResizeObserver) {
+  new ResizeObserver(postHeight).observe(document.body);
+} else {
+  setInterval(postHeight, 1000);
+}
+[300, 1200, 2500].forEach((t) => setTimeout(postHeight, t));
+
+// Activate deferred images that have just become visible (a month/year was opened),
+// then re-measure. The 'toggle' event doesn't bubble, so listen in the capture phase.
+function activateVisibleImages() {
+  sectionsEl.querySelectorAll('img[data-src]').forEach((img) => {
+    if (img.offsetParent !== null) {
+      img.src = img.dataset.src;
+      img.removeAttribute('data-src');
+    }
+  });
+}
+sectionsEl.addEventListener('toggle', () => {
+  activateVisibleImages();
+  postHeight();
+  setTimeout(postHeight, 200);
+}, true);

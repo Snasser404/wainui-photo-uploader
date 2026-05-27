@@ -15,6 +15,18 @@ export default async function handler(req, res) {
     if (!itemId) return res.status(400).json({ error: 'itemId required' });
 
     const { takenAt } = body;
+    // Only keep a plausible date — reject 1601/1970 placeholders and future dates,
+    // so the gallery falls back to OneDrive's extracted EXIF date for those files.
+    let validTaken = null;
+    if (takenAt) {
+      const ms = Date.parse(takenAt);
+      if (!Number.isNaN(ms)) {
+        const d = new Date(ms);
+        if (d.getUTCFullYear() >= 2000 && d.getTime() <= Date.now() + 86400000) {
+          validTaken = takenAt;
+        }
+      }
+    }
     const meta = {
       caption: (caption || '').slice(0, 500),
       tags: Array.isArray(tags)
@@ -24,7 +36,7 @@ export default async function handler(req, res) {
       // takenAt = the file's own date, captured on the device at upload time.
       // Stored immediately so the gallery shows the correct date without waiting
       // for OneDrive to extract EXIF (which happens minutes later).
-      takenAt: takenAt && !Number.isNaN(Date.parse(takenAt)) ? takenAt : null,
+      takenAt: validTaken,
       uploadedAt: new Date().toISOString(),
     };
 
