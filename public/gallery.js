@@ -457,6 +457,12 @@ if (window.ResizeObserver) {
 }
 [300, 1200, 2500].forEach((t) => setTimeout(postHeight, t));
 
+// The parent (embed.js) asks for our height once it's ready — answer immediately.
+// This removes the load-order timing problem that left the frame stuck short.
+window.addEventListener('message', (e) => {
+  if (e && e.data && e.data.type === 'wainui-request-height') postHeight();
+});
+
 // Activate deferred images that have just become visible (a month/year was opened),
 // then re-measure. The 'toggle' event doesn't bubble, so listen in the capture phase.
 function activateVisibleImages() {

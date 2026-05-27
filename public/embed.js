@@ -34,5 +34,20 @@
     }
   }
 
+  // Ask each app frame to report its height. This is the key to reliable sizing:
+  // the footer script can load AFTER the app has already announced its height, so
+  // we proactively request it (and retry a few times to cover slow app loads).
+  function requestHeights() {
+    var frames = document.querySelectorAll('iframe[src*="' + APP_HOST + '"]');
+    for (var i = 0; i < frames.length; i++) {
+      try {
+        frames[i].contentWindow.postMessage({ type: 'wainui-request-height' }, '*');
+      } catch (err) {}
+    }
+  }
+
   window.addEventListener('message', onMessage);
+  window.addEventListener('load', requestHeights);
+  [200, 600, 1200, 2500, 4000].forEach(function (t) { setTimeout(requestHeights, t); });
+  if (document.readyState === 'complete') requestHeights();
 })();

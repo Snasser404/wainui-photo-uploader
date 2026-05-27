@@ -272,8 +272,12 @@ if ('serviceWorker' in navigator) {
   } else {
     setInterval(postHeight, 1000);
   }
-  setTimeout(postHeight, 300);
-  setTimeout(postHeight, 1200);
+  [300, 1200, 2500].forEach((t) => setTimeout(postHeight, t));
+
+  // The parent (embed.js) requests our height once it's ready — answer immediately.
+  window.addEventListener('message', (e) => {
+    if (e && e.data && e.data.type === 'wainui-request-height') postHeight();
+  });
 })();
 
 // ---------- Iframe-aware navigation ----------
