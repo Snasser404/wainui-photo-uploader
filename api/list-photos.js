@@ -44,13 +44,14 @@ function pickThumbnails(thumbs) {
 }
 
 function pickTakenAt(item, meta) {
-  // Prefer the stored file date (captured on the device at upload — stable and
-  // available immediately, so the displayed date never "jumps"). Then fall back
-  // to OneDrive's EXIF date, then video metadata, then upload/created time.
+  // Prefer the photo/video's embedded "date taken" (EXIF / video metadata) — this is
+  // the real capture date and is what members expect when sorting. Fall back to the
+  // file-modified date stored at upload (used only when EXIF is missing, e.g. files
+  // that have passed through WhatsApp), then to upload/created time as a last resort.
   return (
-    (meta && meta.takenAt) ||
     (item.photo && item.photo.takenDateTime) ||
     (item.video && item.video.mediaCreatedDateTime) ||
+    (meta && meta.takenAt) ||
     (meta && meta.uploadedAt) ||
     item.createdDateTime
   );

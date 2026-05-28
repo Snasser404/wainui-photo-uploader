@@ -165,9 +165,9 @@ const server = http.createServer(async (req, res) => {
         .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
       const DATE_RE = /^\d{4}-\d{2}$/;
       const pickTaken = (item, meta) =>
-        (meta && meta.takenAt) ||
         (item.photo && item.photo.takenDateTime) ||
         (item.video && item.video.mediaCreatedDateTime) ||
+        (meta && meta.takenAt) ||
         (meta && meta.uploadedAt) || item.createdDateTime;
       const toEntry = (item, folderUploader) => {
         if (!item.file) return null;
