@@ -33,19 +33,82 @@ function show(step) {
 
 function refreshList() {
   fileList.innerHTML = '';
+  // Free memory from any previously-rendered file previews.
+  fileList.querySelectorAll('img[src^="blob:"], video[src^="blob:"]').forEach((el) => {
+    try { URL.revokeObjectURL(el.src); } catch (e) {}
+  });
   chosenFiles.forEach((file, i) => {
+    const isImage = (file.type || '').startsWith('image/');
+    const isVideo = (file.type || '').startsWith('video/');
+    const previewUrl = (isImage || isVideo) ? URL.createObjectURL(file) : null;
+
     const li = document.createElement('li');
-    li.dataset.index = String(i);
-    li.innerHTML = `
-      <span class="file-icon" aria-hidden="true">&#128247;</span>
-      <span class="file-name"></span>
-      <span class="file-status"></span>
-    `;
-    li.querySelector('.file-name').textContent = file.name;
+    li.className = 'file-item';
+
+    const thumb = document.createElement('div');
+    thumb.className = 'file-thumb';
+    if (isImage && previewUrl) {
+      const img = document.createElement('img');
+      img.src = previewUrl;
+      img.alt = '';
+      img.onerror = function () { this.style.visibility = 'hidden'; };
+      thumb.appendChild(img);
+    } else if (isVideo && previewUrl) {
+      const v = document.createElement('video');
+      v.src = previewUrl;
+      v.muted = true;
+      v.preload = 'metadata';
+      v.playsInline = true;
+      thumb.appendChild(v);
+      const play = document.createElement('span');
+      play.className = 'file-play';
+      play.setAttribute('aria-hidden', 'true');
+      play.textContent = '▶'; // ▶
+      thumb.appendChild(play);
+    }
+
+    const info = document.createElement('div');
+    info.className = 'file-info';
+    const name = document.createElement('div');
+    name.className = 'file-name';
+    name.textContent = file.name;
+    const size = document.createElement('div');
+    size.className = 'file-size';
+    size.textContent = formatSize(file.size);
+    info.appendChild(name);
+    info.appendChild(size);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'file-remove';
+    removeBtn.dataset.index = String(i);
+    removeBtn.setAttribute('aria-label', 'Remove ' + file.name);
+    removeBtn.textContent = '×'; // ×
+
+    li.appendChild(thumb);
+    li.appendChild(info);
+    li.appendChild(removeBtn);
     fileList.appendChild(li);
   });
   uploadButton.disabled = chosenFiles.length === 0;
 }
+
+function formatSize(bytes) {
+  if (!bytes && bytes !== 0) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// Tap the × button to deselect a file before uploading.
+fileList.addEventListener('click', (e) => {
+  const btn = e.target.closest('.file-remove');
+  if (!btn) return;
+  const idx = Number(btn.dataset.index);
+  if (Number.isNaN(idx) || idx < 0 || idx >= chosenFiles.length) return;
+  chosenFiles.splice(idx, 1);
+  refreshList();
+});
 
 fileInput.addEventListener('change', (e) => {
   const newFiles = Array.from(e.target.files || []);

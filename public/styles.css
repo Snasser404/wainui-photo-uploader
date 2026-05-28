@@ -621,6 +621,81 @@ video.lightbox-media { background: #000; }
 .file-list li.done { border-color: var(--green); background: #e8f5e9; }
 .file-list li.failed { border-color: var(--red); background: #ffebee; }
 
+/* New review-before-upload layout: thumbnail + name/size + remove button */
+.file-list li.file-item { padding: 10px 12px; background: #ffffff; }
+
+.file-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  background: #e3e8ee;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.file-thumb::before {
+  content: '📷';
+  font-size: 26px;
+  opacity: 0.45;
+}
+.file-thumb img,
+.file-thumb video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #e3e8ee;
+  display: block;
+}
+.file-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 22px;
+  background: rgba(0,0,0,0.35);
+  pointer-events: none;
+  z-index: 2;
+}
+.file-info { flex: 1; min-width: 0; }
+.file-info .file-name {
+  font-weight: 600;
+  font-size: 17px;
+  line-height: 1.3;
+}
+.file-size {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.file-remove {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: #ffffff;
+  color: var(--red);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.file-remove:hover { background: #ffebee; border-color: var(--red); }
+.file-remove:active { transform: scale(0.94); }
+.file-remove:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+
 .file-name {
   flex: 1;
   overflow: hidden;
