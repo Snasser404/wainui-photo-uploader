@@ -384,7 +384,16 @@ lightboxInfo.addEventListener('click', (e) => {
 lightboxClose.addEventListener('click', closeLightbox);
 lightboxPrev.addEventListener('click', () => navLightbox(-1));
 lightboxNext.addEventListener('click', () => navLightbox(1));
+
+// Touch/gesture state, shared by the click + swipe handlers below.
+let touchStartX = null, touchStartY = null, touchMoved = false;
+
 lightbox.addEventListener('click', (e) => {
+  // Ignore the click the browser synthesizes at the END of a swipe/drag — only a
+  // genuine, stationary tap on the dark background should close the viewer. On a
+  // phone, swiping to the next photo was being followed by a background "click"
+  // that closed the lightbox and dropped the user back to the gallery.
+  if (touchMoved) { touchMoved = false; return; }
   if (e.target === lightbox) closeLightbox();
 });
 
@@ -395,9 +404,17 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowRight') navLightbox(1);
 });
 
-let touchStartX = null;
 lightbox.addEventListener('touchstart', (e) => {
-  if (e.touches && e.touches[0]) touchStartX = e.touches[0].clientX;
+  if (e.touches && e.touches[0]) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchMoved = false;
+  }
+}, { passive: true });
+lightbox.addEventListener('touchmove', (e) => {
+  if (touchStartX === null || !e.touches || !e.touches[0]) return;
+  if (Math.abs(e.touches[0].clientX - touchStartX) > 10 ||
+      Math.abs(e.touches[0].clientY - touchStartY) > 10) touchMoved = true;
 }, { passive: true });
 lightbox.addEventListener('touchend', (e) => {
   if (touchStartX === null) return;
@@ -405,6 +422,7 @@ lightbox.addEventListener('touchend', (e) => {
   const dx = endX - touchStartX;
   if (Math.abs(dx) > 50) navLightbox(dx > 0 ? -1 : 1);
   touchStartX = null;
+  touchStartY = null;
 }, { passive: true });
 
 async function load() {
