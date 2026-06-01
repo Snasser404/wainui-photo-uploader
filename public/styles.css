@@ -469,7 +469,9 @@ video.lightbox-media { background: #000; }
 }
 .lightbox-action:active,
 .lightbox-nav:active { transform: scale(0.95); }
-.lightbox-close { top: 16px; right: 16px; font-size: 30px; }
+/* Close is now the primary way out of the viewer, so make it stand out a bit
+   more than the other controls. */
+.lightbox-close { top: 16px; right: 16px; font-size: 30px; background: rgba(255, 255, 255, 0.22); }
 .lightbox-download { top: 16px; right: 80px; }
 .lightbox-download svg { display: block; }
 .lightbox-prev  { left: 16px; top: 50%; transform: translateY(-50%); }
