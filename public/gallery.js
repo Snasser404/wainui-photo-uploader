@@ -251,14 +251,15 @@ function renderGallery() {
 }
 
 // ---------- Fullscreen helpers ----------
-function requestFs(el) {
-  const fn = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
-  if (fn) { try { fn.call(el).catch(() => {}); } catch {} }
-}
-function exitFs() {
-  const fn = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
-  const has = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
-  if (fn && has) { try { fn.call(document).catch(() => {}); } catch {} }
+// Quietly pre-load the next and previous images so swiping through the gallery
+// is instant instead of waiting on the network on every tap.
+function prefetchNeighbors(index) {
+  if (!visiblePhotos.length) return;
+  for (const delta of [1, -1]) {
+    const n = visiblePhotos[(index + delta + visiblePhotos.length) % visiblePhotos.length];
+    const src = n && (n.thumbnailHd || (n.type === 'image' ? n.download : null));
+    if (src) { const img = new Image(); img.src = src; }
+  }
 }
 
 function openLightbox(index) {
@@ -268,13 +269,35 @@ function openLightbox(index) {
 
   lightboxMediaWrap.innerHTML = '';
   if (p.type === 'video' && p.download) {
-    const v = document.createElement('video');
-    v.src = p.download;
-    v.controls = true;
-    v.autoplay = true;
-    v.playsInline = true;
-    v.className = 'lightbox-media';
-    lightboxMediaWrap.appendChild(v);
+    // Don't pull the (often large) original video just because the user swiped
+    // onto it — show the poster thumbnail with a Play button and only load the
+    // video file when they actually tap Play.
+    const holder = document.createElement('div');
+    holder.className = 'lightbox-video-holder';
+    if (p.thumbnailHd || p.thumbnail) {
+      const poster = document.createElement('img');
+      poster.src = p.thumbnailHd || p.thumbnail;
+      poster.alt = p.caption || p.name;
+      poster.className = 'lightbox-media';
+      holder.appendChild(poster);
+    }
+    const play = document.createElement('button');
+    play.type = 'button';
+    play.className = 'lightbox-play';
+    play.setAttribute('aria-label', 'Play video');
+    play.innerHTML = '<span aria-hidden="true">&#9654;</span>';
+    holder.appendChild(play);
+    holder.addEventListener('click', () => {
+      const v = document.createElement('video');
+      v.src = p.download;
+      v.controls = true;
+      v.autoplay = true;
+      v.playsInline = true;
+      v.className = 'lightbox-media';
+      lightboxMediaWrap.innerHTML = '';
+      lightboxMediaWrap.appendChild(v);
+    });
+    lightboxMediaWrap.appendChild(holder);
   } else if (p.thumbnailHd || p.download) {
     // Show the screen-sized 800px version for fast, clear viewing — NOT the
     // multi-MB original. The original is only fetched via the Download button.
@@ -315,11 +338,10 @@ function openLightbox(index) {
 
   lightbox.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
-  requestFs(lightbox);
+  prefetchNeighbors(index);
 }
 
 function closeLightbox() {
-  exitFs();
   lightbox.classList.add('hidden');
   lightboxMediaWrap.innerHTML = '';
   document.body.style.overflow = '';
@@ -372,19 +394,6 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowLeft') navLightbox(-1);
   if (e.key === 'ArrowRight') navLightbox(1);
 });
-
-// Sync lightbox open state with fullscreen — if user exits fullscreen, close the lightbox.
-function onFsChange() {
-  const fs = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
-  if (!fs && !lightbox.classList.contains('hidden')) {
-    lightbox.classList.add('hidden');
-    lightboxMediaWrap.innerHTML = '';
-    document.body.style.overflow = '';
-    currentIndex = -1;
-  }
-}
-document.addEventListener('fullscreenchange', onFsChange);
-document.addEventListener('webkitfullscreenchange', onFsChange);
 
 let touchStartX = null;
 lightbox.addEventListener('touchstart', (e) => {
@@ -442,7 +451,7 @@ if ('serviceWorker' in navigator) {
 // Grows the embedding iframe to fit the gallery so there's no scrolling inside the frame.
 // Re-fires whenever content changes (images load, filters applied, sections expand/collapse).
 function postHeight() {
-  // While the fullscreen lightbox is open the browser owns the screen; skip resizing.
+  // While the lightbox overlay is open, don't resize the embedding frame.
   if (!lightbox.classList.contains('hidden')) return;
   const h = Math.ceil(document.documentElement.scrollHeight);
   try { window.parent.postMessage({ type: 'wainui-height', height: h }, '*'); } catch (e) {}
